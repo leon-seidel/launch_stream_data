@@ -32,7 +32,7 @@ while cap.isOpened():
     ret, frame = cap.read()
 
     if stage1 is True:
-        cropped_frame = frame[960:1005, 103:395]  # Stage 1
+        cropped_frame = frame[960:1005, 103:395]    # Stage 1
     else:
         cropped_frame = frame[960:1005, 1525:1820]  # Stage 2
 
