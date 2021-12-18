@@ -1,5 +1,5 @@
 # Arguments --filename (Video filename), --fps (Video frames per second, default: 30), --stage (Stage 1 or stage 2,
-# default: 1) and --timedelay' (Time (s) between video start and T0, default:0)
+# default: 1) and --timedelay' (Negative time (s) between video start and T0, default:0)
 
 import re
 import cv2
