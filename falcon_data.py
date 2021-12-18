@@ -3,10 +3,10 @@
 
 import re
 import cv2
-import csv
 import time
 import argparse
 import pytesseract
+import pandas as pd
 
 pytesseract.pytesseract.tesseract_cmd = 'C:/Program Files/Tesseract-OCR/tesseract.exe'
 start_time = time.time()
@@ -19,13 +19,12 @@ def get_falcon_data(arguments):
     stage = arguments.stage
     tf = arguments.timedelay
 
+    df = pd.DataFrame(columns=["t", "v", "h"])
+
     if stage == '1':
         csv_filename = video_filename.split('.')[0] + '_stage1.csv'  # Stage 1
     else:
         csv_filename = video_filename.split('.')[0] + '_stage2.csv'  # Stage 2
-
-    f = open(csv_filename, "w+")
-    f.close()
 
     cap = cv2.VideoCapture(video_filename)
     number_of_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -75,12 +74,12 @@ def get_falcon_data(arguments):
 
         print("--- %s seconds ---\n" % round((time.time() - start_time), 2))
 
-        with open(csv_filename, 'a', newline='') as csv_file:
-            writer = csv.writer(csv_file)
-            writer.writerow([t_frame, v_frame, h_frame])
+        df = df.append({'t': t_frame, 'v': v_frame, 'h': h_frame}, ignore_index=True)
 
     cap.release()
     cv2.destroyAllWindows()
+
+    df.to_csv(csv_filename, index=False)
 
     print("Finished! Average time per frame: " + str(round(((time.time() - start_time) / number_of_frames), 3)) + " s.")
 
