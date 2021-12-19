@@ -28,8 +28,13 @@ def get_falcon_data(arguments):
     stage = arguments.stage
     tf = arguments.timedelay
 
+    df = pd.DataFrame(columns=["t", "v", "h"])
+
+    milliseconds = 1000
+    frame_number = 0
+    fps = 30
+
     video = pafy.new(url)
-    video_title = video.title
 
     stream_1080mp4 = None
 
@@ -41,20 +46,9 @@ def get_falcon_data(arguments):
         print("No 1080p mp4 stream found")
         quit()
 
-    if stage == '1':
-        csv_filename = video_title + '_stage1.csv'  # Stage 1
-    elif stage == '2':
-        csv_filename = video_title + '_stage2.csv'  # Stage 2
-    else:
-        quit()
+    csv_filename = video.title + "_stage" + stage + ".csv"
 
     cap = cv2.VideoCapture(stream_1080mp4.url)
-
-    df = pd.DataFrame(columns=["t", "v", "h"])
-
-    milliseconds = 1000
-    frame_number = 0
-    fps = 30
 
     cap.set(cv2.CAP_PROP_POS_MSEC, video_start_time * milliseconds)
 
