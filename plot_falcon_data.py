@@ -32,11 +32,20 @@ def show_stuff(csv_name, plot_type):
                     plt.scatter(df.t, df.v)
                 elif i == 1:
                     plt.scatter(df.t, df.h)
+        if i == 0:
+            plt.title("Time vs. velocity")
+            plt.xlabel("Time in s")
+            plt.ylabel("Velocity in kph")
+        elif i == 1:
+            plt.title("Time vs. altitude")
+            plt.xlabel("Time in s")
+            plt.ylabel("Altitude in km")
+        plt.legend(["Stage 1", "Stage 2"])
         plt.grid()
         plt.show()
 
 
-csv_names = ["falcon_data_stage1.csv"]
+csv_names = ["falcon_data_stage1.csv", "falcon_data_stage2.csv"]
 plot_or_scatter = "scatter"
 
 show_stuff(csv_names, plot_or_scatter)
