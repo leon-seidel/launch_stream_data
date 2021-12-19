@@ -1,12 +1,16 @@
 # Arguments --filename (Video filename), --fps (Video frames per second, default: 30), --stage (Stage 1 or stage 2,
-# default: 1) and --timedelay' (Negative time (s) between video start and T0, default:0)
+# default: 1), --timedelay' (Negative time (s) between video start and T0, default:0) and --plottype (Plot or scatter
+# data, default: no plot)
 
 import re
 import cv2
 import time
 import argparse
 import pytesseract
+import numpy as np
 import pandas as pd
+from scipy import stats
+from matplotlib import pyplot as plt
 
 pytesseract.pytesseract.tesseract_cmd = 'C:/Program Files/Tesseract-OCR/tesseract.exe'
 start_time = time.time()
@@ -87,6 +91,40 @@ def get_falcon_data(arguments):
 
     print("Finished! Average time per frame: " + str(round(((time.time() - start_time) / number_of_frames), 3)) + " s.")
 
+    if args.plottype is not None:
+        plot_falcon_data(df, arguments)
+
+
+def plot_falcon_data(df, arguments):
+
+    df = df.dropna()                                            # Delete rows without values
+
+    # df = df[(np.abs(stats.zscore(df)) < 1.8).all(axis=1)]     # Delete outliers in all columns
+    df = df[(np.abs(stats.zscore(df.v)) < 1.8)]                 # Delete velocity outliers
+    df = df[(np.abs(stats.zscore(df.h)) < 1.8)]                 # Delete altitude outliers
+
+    if arguments.plottype == "plot":
+        plt.plot(df.t, df.v)
+    elif arguments.plottype == "scatter":
+        plt.scatter(df.t, df.v)
+
+    plt.title("Time vs. velocity of stage " + arguments.stage)
+    plt.xlabel("Time in s")
+    plt.ylabel("Velocity in kph")
+    plt.grid()
+    plt.show()
+
+    if arguments.plottype == "plot":
+        plt.plot(df.t, df.h)
+    elif arguments.plottype == "scatter":
+        plt.scatter(df.t, df.h)
+
+    plt.title("Time vs. altitude of stage " + arguments.stage)
+    plt.xlabel("Time in s")
+    plt.ylabel("Altitude in km")
+    plt.grid()
+    plt.show()
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Read data from SpaceX Falcon 9 starts')
@@ -95,9 +133,13 @@ if __name__ == '__main__':
     parser.add_argument('--fps', nargs='?', type=float, help='Video frames per second')
     parser.add_argument('--stage', nargs='?', choices=['1', '2'], help='Stage 1 or stage 2')
     parser.add_argument('--timedelay', nargs='?', type=float, help='Time (s) between video start and T0')
+    parser.add_argument('--plottype', nargs='?', choices=['plot', 'scatter'], help='Plot or scatter data')
 
     args = parser.parse_args()
 
+    if args.filename is None:
+        print("Pleade add a filename with --filename abc.mp4")
+        quit()
     if args.fps is None:
         args.fps = 30
     if args.stage is None:
