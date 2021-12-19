@@ -1,6 +1,9 @@
 # Arguments --url (Video URL), --start (Start time in video in seconds), --end (End time in video in seconds),
-# --stage (Stage 1 or stage 2, default: 1), --timedelay' (Negative time (s) between video start and T0, default:0)
+# --stage (Stage 1 or stage 2, default: 1), --timedelay' (Negative time (s) between video start and T0, default: 0.0)
 # and --plottype (Plot or scatter data, default: no plot)
+#
+# Example: python falcon_data.py --url https://www.youtube.com/watch?v=JBGjE9_aosc --start 1193 --end 1724 --stage 1
+# --timedelay 0.0 --plottype scatter
 
 import re
 import cv2
