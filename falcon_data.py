@@ -23,8 +23,10 @@ def get_falcon_data(arguments):
 
     if stage == '1':
         csv_filename = video_filename.split('.')[0] + '_stage1.csv'  # Stage 1
-    else:
+    elif stage == '2':
         csv_filename = video_filename.split('.')[0] + '_stage2.csv'  # Stage 2
+    else:
+        quit()
 
     cap = cv2.VideoCapture(video_filename)
     number_of_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -43,8 +45,10 @@ def get_falcon_data(arguments):
 
         if stage == '1':
             cropped_frame = frame[960:1005, 103:395]    # Stage 1
-        else:
+        elif stage == '2':
             cropped_frame = frame[960:1005, 1525:1820]  # Stage 2
+        else:
+            break
 
         gray = cv2.cvtColor(cropped_frame, cv2.COLOR_BGR2GRAY)
 
