@@ -17,7 +17,6 @@ from scipy import stats
 from matplotlib import pyplot as plt
 
 pytesseract.pytesseract.tesseract_cmd = 'C:/Program Files/Tesseract-OCR/tesseract.exe'
-start_time = time.time()
 
 
 def get_falcon_data(arguments):
@@ -30,6 +29,23 @@ def get_falcon_data(arguments):
 
     df = pd.DataFrame(columns=["t", "v", "h"])
 
+    plt.ion()
+    fig, ax = plt.subplots()
+    x1, y1 = [], []
+    x2, y2 = [], []
+    sc = ax.scatter(x1, y1)
+    sd = ax.scatter(x2, y2)
+    plt.xlim(0, video_end_time-video_start_time)
+    plt.ylim(0, 30000)
+    plt.legend(["Stage 1", "Stage 2"])
+    plt.title("Time vs. velocity")
+    plt.xlabel("Time in s")
+    plt.ylabel("Velocity in kph")
+    plt.grid()
+
+    plt.draw()
+
+    every_n = 15  # Only analyse every nth frame
     milliseconds = 1000
     frame_number = 0
     fps = 30
@@ -39,7 +55,7 @@ def get_falcon_data(arguments):
     stream_720mp4 = None
 
     for stream in video.allstreams:
-        if stream.resolution == "1280x720" and stream.extension == "mp4":
+        if stream.resolution == "1280x720" and stream.extension == "webm":
             stream_720mp4 = stream
 
     if stream_720mp4 is None:
@@ -52,51 +68,85 @@ def get_falcon_data(arguments):
 
     cap.set(cv2.CAP_PROP_POS_MSEC, video_start_time * milliseconds)
 
+    start_time = time.time()
+
     while True and cap.get(cv2.CAP_PROP_POS_MSEC) <= video_end_time * milliseconds:
 
+        p = (frame_number / every_n) - (int(frame_number / every_n))
         frame_number += 1
-
-        t_frame = round(tf, 3)
+        tf += (1 / fps)
 
         ret, frame = cap.read()
 
-        if stage == '1':
-            cropped_frame = frame[640:670, 68:264]  # Stage 1
-        elif stage == '2':
-            cropped_frame = frame[640:670, 1016:1207]  # Stage 2
-        else:
-            break
+        if p != 0:
+            continue
 
-        gray = cv2.cvtColor(cropped_frame, cv2.COLOR_BGR2GRAY)
+        t_frame = round(tf, 3)
 
-        custom_config = '-l eng --oem 3 --psm 6 '
-        text = pytesseract.image_to_string(gray, config=custom_config)
+        cropped_frame1 = frame[640:670, 68:264]  # Stage 1
 
-        text_list = re.findall(r"[-+]?\d*\.?\d+|[-+]?\d+", text)
+        cropped_frame2 = frame[640:670, 1016:1207]  # Stage 2
 
-        if len(text_list) == 2:
+        gray1 = cv2.cvtColor(cropped_frame1, cv2.COLOR_BGR2GRAY)
+        gray2 = cv2.cvtColor(cropped_frame2, cv2.COLOR_BGR2GRAY)
+
+        custom_config = '--oem 3 --psm 6 '
+        text1 = pytesseract.image_to_string(gray1, config=custom_config)
+        text2 = pytesseract.image_to_string(gray2, config=custom_config)
+
+        text_list1 = re.findall(r"[-+]?\d*\.?\d+|[-+]?\d+", text1)
+        text_list2 = re.findall(r"[-+]?\d*\.?\d+|[-+]?\d+", text2)
+
+        if len(text_list1) == 2:
 
             try:
-                v_frame = float(text_list[0])
+                v_frame1 = float(text_list1[0])
             except ValueError:
-                v_frame = None
+                v_frame1 = None
 
             try:
-                h_frame = float(text_list[1])
+                h_frame1 = float(text_list1[1])
             except ValueError:
-                h_frame = None
+                h_frame1 = None
 
         else:
-            v_frame = None
-            h_frame = None
+            v_frame1 = None
+            h_frame1 = None
 
-        tf = tf + (1 / fps)
+        if len(text_list2) == 2:
 
-        print(t_frame, v_frame, h_frame)
+            try:
+                v_frame2 = float(text_list2[0])
+            except ValueError:
+                v_frame2 = None
 
-        print("--- %s seconds ---\n" % round((time.time() - start_time), 2))
+            try:
+                h_frame2 = float(text_list2[1])
+            except ValueError:
+                h_frame2 = None
 
-        df = df.append({'t': t_frame, 'v': v_frame, 'h': h_frame}, ignore_index=True)
+        else:
+            v_frame2 = None
+            h_frame2 = None
+
+        print("\n", t_frame, v_frame1, h_frame1, v_frame2, h_frame2)
+
+        time_passed = time.time() - start_time
+
+        print("Total : " + str(round(time_passed, 2)) + " s. Average fps: " + str(round(frame_number / time_passed, 2)))
+
+        # df = df.append({'t': t_frame, 'v': v_frame, 'h': h_frame}, ignore_index=True)
+
+        x1.append(t_frame)
+        y1.append(v_frame1)
+        x2.append(t_frame)
+        y2.append(v_frame2)
+        sc.set_offsets(np.c_[x1, y1])
+        sd.set_offsets(np.c_[x2, y2])
+        fig.canvas.draw_idle()
+        plt.pause(0.001)
+
+    plt.waitforbuttonpress()
 
     cap.release()
     cv2.destroyAllWindows()
@@ -165,3 +215,5 @@ if __name__ == '__main__':
         args.timedelay = 0.0
 
     get_falcon_data(args)
+
+
