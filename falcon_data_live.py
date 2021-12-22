@@ -1,10 +1,9 @@
-# Arguments --url (Video URL), --start (Start time in video in seconds), --end (End time in video in seconds),
-# --stage (Stage 1 or stage 2, default: 1), --timedelay' (Negative time (s) between video start and T0, default: 0.0)
-# and --plottype (Plot or scatter data, default: no plot)
+# Arguments --url (Video URL), --start (Start time in video in seconds), --end (End time in video in seconds), and
+# --plot (Plot velocity or altitude, default: velocity)
 #
-# Example: python falcon_data.py --url https://www.youtube.com/watch?v=JBGjE9_aosc --start 1193 --end 1724 --stage 1
-# --timedelay 0.0 --plottype scatter
-import math
+# Example: python falcon_data_live.py --url https://www.youtube.com/watch?v=JBGjE9_aosc --start 1193 --end 1724
+# --plot altitude
+
 import re
 import cv2
 import pafy                         # install with: pip install git+https://github.com/Cupcakus/pafy
@@ -13,7 +12,6 @@ import argparse
 import pytesseract
 import numpy as np
 import pandas as pd
-from scipy import stats
 from matplotlib import pyplot as plt
 
 pytesseract.pytesseract.tesseract_cmd = 'C:/Program Files/Tesseract-OCR/tesseract.exe'
@@ -21,34 +19,42 @@ pytesseract.pytesseract.tesseract_cmd = 'C:/Program Files/Tesseract-OCR/tesserac
 
 def get_falcon_data(arguments):
 
+    upper_limit_velocity_plot = 30000
+    upper_limit_altitude_plot = 250
+    every_n = 15                            # Only analyse every nth frame
+    fps = 30                                # Video fps
+
+    tf = 0
+    frame_number = 0
+
     url = arguments.url
     video_start_time = arguments.start
     video_end_time = arguments.end
-    stage = arguments.stage
-    tf = arguments.timedelay
-
-    df = pd.DataFrame(columns=["t", "v", "h"])
+    data_to_plot = arguments.plot
 
     plt.ion()
     fig, ax = plt.subplots()
-    x1, y1 = [], []
-    x2, y2 = [], []
-    sc = ax.scatter(x1, y1)
-    sd = ax.scatter(x2, y2)
+    t, v, h = [[], []], [[], []], [[], []]
+
+    if data_to_plot == "velocity":
+        sc1 = ax.scatter(t[0], v[0])
+        sc2 = ax.scatter(t[1], v[1])
+        plt.ylim(0, upper_limit_velocity_plot)
+        plt.title("Time vs. velocity")
+        plt.ylabel("Velocity in kph")
+    else:
+        sc1 = ax.scatter(t[0], h[0])
+        sc2 = ax.scatter(t[1], h[1])
+        plt.ylim(0, upper_limit_altitude_plot)
+        plt.title("Time vs. altitude")
+        plt.ylabel("Altitude in km")
+
     plt.xlim(0, video_end_time-video_start_time)
-    plt.ylim(0, 30000)
     plt.legend(["Stage 1", "Stage 2"])
-    plt.title("Time vs. velocity")
     plt.xlabel("Time in s")
-    plt.ylabel("Velocity in kph")
     plt.grid()
 
     plt.draw()
-
-    every_n = 15  # Only analyse every nth frame
-    milliseconds = 1000
-    frame_number = 0
-    fps = 30
 
     video = pafy.new(url)
 
@@ -62,15 +68,15 @@ def get_falcon_data(arguments):
         print("No 720p mp4 stream found")
         quit()
 
-    csv_filename = "".join(x for x in video.title if x.isalnum()) + "_stage" + stage + ".csv"
+    csv_filename = "".join(x for x in video.title if x.isalnum()) + ".csv"
 
     cap = cv2.VideoCapture(stream_720mp4.url)
 
-    cap.set(cv2.CAP_PROP_POS_MSEC, video_start_time * milliseconds)
+    cap.set(cv2.CAP_PROP_POS_MSEC, video_start_time * 1000)
 
     start_time = time.time()
 
-    while True and cap.get(cv2.CAP_PROP_POS_MSEC) <= video_end_time * milliseconds:
+    while True and cap.get(cv2.CAP_PROP_POS_MSEC) <= video_end_time * 1000:
 
         p = (frame_number / every_n) - (int(frame_number / every_n))
         frame_number += 1
@@ -82,67 +88,55 @@ def get_falcon_data(arguments):
             continue
 
         t_frame = round(tf, 3)
+        print()
 
-        cropped_frame1 = frame[640:670, 68:264]  # Stage 1
+        for stage in range(1, 3):
 
-        cropped_frame2 = frame[640:670, 1016:1207]  # Stage 2
+            if stage == 1:
+                cropped_frame = frame[640:670, 68:264]  # Stage 1
+            else:
+                cropped_frame = frame[640:670, 1016:1207]  # Stage 2
 
-        gray1 = cv2.cvtColor(cropped_frame1, cv2.COLOR_BGR2GRAY)
-        gray2 = cv2.cvtColor(cropped_frame2, cv2.COLOR_BGR2GRAY)
+            gray = cv2.cvtColor(cropped_frame, cv2.COLOR_BGR2GRAY)
 
-        custom_config = '--oem 3 --psm 6 '
-        text1 = pytesseract.image_to_string(gray1, config=custom_config)
-        text2 = pytesseract.image_to_string(gray2, config=custom_config)
+            custom_config = '--oem 3 --psm 6 '
+            text = pytesseract.image_to_string(gray, config=custom_config)
+            text_list = re.findall(r"[-+]?\d*\.?\d+|[-+]?\d+", text)
 
-        text_list1 = re.findall(r"[-+]?\d*\.?\d+|[-+]?\d+", text1)
-        text_list2 = re.findall(r"[-+]?\d*\.?\d+|[-+]?\d+", text2)
+            if len(text_list) == 2:
 
-        if len(text_list1) == 2:
+                try:
+                    v_frame = float(text_list[0])
+                except ValueError:
+                    v_frame = None
 
-            try:
-                v_frame1 = float(text_list1[0])
-            except ValueError:
-                v_frame1 = None
+                try:
+                    h_frame = float(text_list[1])
+                except ValueError:
+                    h_frame = None
 
-            try:
-                h_frame1 = float(text_list1[1])
-            except ValueError:
-                h_frame1 = None
+            else:
+                v_frame = None
+                h_frame = None
 
-        else:
-            v_frame1 = None
-            h_frame1 = None
+            t[stage - 1].append(t_frame)
+            v[stage - 1].append(v_frame)
+            h[stage - 1].append(h_frame)
 
-        if len(text_list2) == 2:
-
-            try:
-                v_frame2 = float(text_list2[0])
-            except ValueError:
-                v_frame2 = None
-
-            try:
-                h_frame2 = float(text_list2[1])
-            except ValueError:
-                h_frame2 = None
-
-        else:
-            v_frame2 = None
-            h_frame2 = None
-
-        print("\n", t_frame, v_frame1, h_frame1, v_frame2, h_frame2)
+            print("Stage", stage, ": t=", t_frame, "s, v=", v_frame, "kph, h=", h_frame, "km")
 
         time_passed = time.time() - start_time
+        average_fps = frame_number / time_passed
 
-        print("Total : " + str(round(time_passed, 2)) + " s. Average fps: " + str(round(frame_number / time_passed, 2)))
+        print("Average fps: " + str(round(average_fps, 2)) + ", total time: " + str(round(time_passed, 2)) + " s")
 
-        # df = df.append({'t': t_frame, 'v': v_frame, 'h': h_frame}, ignore_index=True)
+        if data_to_plot == "velocity":
+            sc1.set_offsets(np.c_[t[0], v[0]])
+            sc2.set_offsets(np.c_[t[1], v[1]])
+        else:
+            sc1.set_offsets(np.c_[t[0], h[0]])
+            sc2.set_offsets(np.c_[t[1], h[1]])
 
-        x1.append(t_frame)
-        y1.append(v_frame1)
-        x2.append(t_frame)
-        y2.append(v_frame2)
-        sc.set_offsets(np.c_[x1, y1])
-        sd.set_offsets(np.c_[x2, y2])
         fig.canvas.draw_idle()
         plt.pause(0.001)
 
@@ -151,42 +145,10 @@ def get_falcon_data(arguments):
     cap.release()
     cv2.destroyAllWindows()
 
+    df = pd.DataFrame(list(zip(t[0], v[0], h[0], v[1], h[1])), columns=["t", "v1", "h1", "v2", "h2"])
     df.to_csv(csv_filename, index=False)
 
-    print("Finished! Average fps: " + str(round((frame_number / (time.time() - start_time)), 1)))
-
-    if args.plottype is not None:
-        plot_falcon_data(df, arguments)
-
-
-def plot_falcon_data(df, arguments):
-    df = df.dropna()  # Delete rows without values
-
-    # df = df[(np.abs(stats.zscore(df)) < 1.8).all(axis=1)]     # Delete outliers in all columns
-    df = df[(np.abs(stats.zscore(df.v)) < 1.8)]  # Delete velocity outliers
-    df = df[(np.abs(stats.zscore(df.h)) < 1.8)]  # Delete altitude outliers
-
-    if arguments.plottype == "plot":
-        plt.plot(df.t, df.v)
-    elif arguments.plottype == "scatter":
-        plt.scatter(df.t, df.v)
-
-    plt.title("Time vs. velocity of stage " + arguments.stage)
-    plt.xlabel("Time in s")
-    plt.ylabel("Velocity in kph")
-    plt.grid()
-    plt.show()
-
-    if arguments.plottype == "plot":
-        plt.plot(df.t, df.h)
-    elif arguments.plottype == "scatter":
-        plt.scatter(df.t, df.h)
-
-    plt.title("Time vs. altitude of stage " + arguments.stage)
-    plt.xlabel("Time in s")
-    plt.ylabel("Altitude in km")
-    plt.grid()
-    plt.show()
+    print("Finished!")
 
 
 if __name__ == '__main__':
@@ -195,25 +157,19 @@ if __name__ == '__main__':
     parser.add_argument('--url', nargs='?', type=str, help='Video URL')
     parser.add_argument('--start', nargs='?', type=float, help='Start time in video (seconds)')
     parser.add_argument('--end', nargs='?', type=float, help='End time in video (seconds)')
-    parser.add_argument('--stage', nargs='?', choices=['1', '2'], help='Stage 1 or stage 2')
-    parser.add_argument('--timedelay', nargs='?', type=float, help='Time (s) between video start and T0')
-    parser.add_argument('--plottype', nargs='?', choices=['plot', 'scatter'], help='Plot or scatter data')
+    parser.add_argument('--plot', nargs='?', choices=['velocity', 'altitude'], help='Plot velocity or altitude')
 
     args = parser.parse_args()
 
     if args.url is None:
-        print("Pleade add an URL with --url https://youtube.com/abc")
+        print("Pleade add an URL with --url https://www.youtube.com/watch?v=JBGjE9_aosc")
         quit()
     if args.start is None:
         args.start = 0
     if args.end is None:
         print("Pleade add an end time in video in seconds with --end 400")
         quit()
-    if args.stage is None:
-        args.stage = '1'
-    if args.timedelay is None:
-        args.timedelay = 0.0
+    if args.plot is None:
+        args.plot = "velocity"
 
     get_falcon_data(args)
-
-
