@@ -31,33 +31,35 @@ def get_falcon_data(arguments):
     url = arguments.url
     video_start_time = arguments.start
     video_end_time = arguments.end
-    data_to_plot = arguments.plot
 
     video = pafy.new(url)
 
-    plt.ion()
-    fig, ax = plt.subplots()
     t, v, h = [[], []], [[], []], [[], []]
 
-    if data_to_plot == "velocity":
-        sc1 = ax.scatter(t[0], v[0])
-        sc2 = ax.scatter(t[1], v[1])
-        plt.ylim(0, upper_limit_velocity_plot)
-        # plt.title("Time vs. velocity")
-        plt.ylabel("Velocity in kph")
-    else:
-        sc1 = ax.scatter(t[0], h[0])
-        sc2 = ax.scatter(t[1], h[1])
-        plt.ylim(0, upper_limit_altitude_plot)
-        # plt.title("Time vs. altitude")
-        plt.ylabel("Altitude in km")
-
-    plt.title(video.title)
-    plt.xlim(0, video_end_time-video_start_time)
+    plt.ion()
+    fig1, ax1 = plt.subplots()
+    sc_velo1 = ax1.scatter(t[0], v[0])
+    sc_velo2 = ax1.scatter(t[1], v[1])
+    plt.title(video.title + ": Time vs. velocity")
     plt.legend(["Stage 1", "Stage 2"])
+    plt.xlim(0, video_end_time - video_start_time)
+    plt.ylim(0, upper_limit_velocity_plot)
     plt.xlabel("Time in s")
+    plt.ylabel("Velocity in kph")
     plt.grid()
+    plt.draw()
 
+    plt.ion()
+    fig2, ax2 = plt.subplots()
+    sc_alti1 = ax2.scatter(t[0], h[0])
+    sc_alti2 = ax2.scatter(t[1], h[1])
+    plt.title(video.title + ": Time vs. altitude")
+    plt.legend(["Stage 1", "Stage 2"])
+    plt.xlim(0, video_end_time - video_start_time)
+    plt.ylim(0, upper_limit_altitude_plot)
+    plt.xlabel("Time in s")
+    plt.ylabel("Altitude in km")
+    plt.grid()
     plt.draw()
 
     stream_720mp4 = None
@@ -130,14 +132,14 @@ def get_falcon_data(arguments):
 
         print("Average fps: " + str(round(average_fps, 2)) + ", total time: " + str(round(time_passed, 2)) + " s")
 
-        if data_to_plot == "velocity":
-            sc1.set_offsets(np.c_[t[0], v[0]])
-            sc2.set_offsets(np.c_[t[1], v[1]])
-        else:
-            sc1.set_offsets(np.c_[t[0], h[0]])
-            sc2.set_offsets(np.c_[t[1], h[1]])
+        sc_velo1.set_offsets(np.c_[t[0], v[0]])
+        sc_velo2.set_offsets(np.c_[t[1], v[1]])
+        fig1.canvas.draw_idle()
+        plt.pause(0.001)
 
-        fig.canvas.draw_idle()
+        sc_alti1.set_offsets(np.c_[t[0], h[0]])
+        sc_alti2.set_offsets(np.c_[t[1], h[1]])
+        fig2.canvas.draw_idle()
         plt.pause(0.001)
 
     plt.waitforbuttonpress()
@@ -160,7 +162,6 @@ if __name__ == '__main__':
     parser.add_argument('--url', nargs='?', type=str, help='Video URL')
     parser.add_argument('--start', nargs='?', type=float, help='Start time in video (seconds)')
     parser.add_argument('--end', nargs='?', type=float, help='End time in video (seconds)')
-    parser.add_argument('--plot', nargs='?', choices=['velocity', 'altitude'], help='Plot velocity or altitude')
 
     args = parser.parse_args()
 
@@ -172,7 +173,5 @@ if __name__ == '__main__':
     if args.end is None:
         print("Pleade add an end time in video in seconds with --end 400")
         quit()
-    if args.plot is None:
-        args.plot = "velocity"
 
     get_falcon_data(args)

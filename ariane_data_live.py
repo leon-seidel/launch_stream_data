@@ -25,8 +25,8 @@ def get_falcon_data(arguments):
     upper_limit_altitude_plot = 1500
     lower_limit_acceleration_plot = -1
     upper_limit_acceleration_plot = 4
-    mean_of_last = 30                       # Mean value of last n acceleration values
-    every_n = 15                            # Only analyse every nth frame
+    mean_of_last = 100                      # Mean value of last n acceleration values
+    every_n = 5                             # Only analyse every nth frame
     fps = 30                                # Video fps
 
     tf = 60
