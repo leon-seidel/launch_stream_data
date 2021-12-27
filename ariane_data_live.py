@@ -63,7 +63,7 @@ def get_falcon_data(arguments):
 
     plt.ion()
     fig3, ax3 = plt.subplots()
-    sc_acc = ax3.scatter(t, h)
+    sc_acc = ax3.scatter(t, a_mean)
     plt.ylim(lower_limit_acceleration_plot, upper_limit_acceleration_plot)
     plt.title("JWST launch: Time vs. acceleration")
     plt.ylabel("Acceleration in gs")
