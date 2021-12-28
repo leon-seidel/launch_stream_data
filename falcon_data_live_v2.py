@@ -28,6 +28,8 @@ def get_falcon_data(arguments):
     # Outlier prevention #####################################################################
     lower_limit_acceleration = -5           # Highest negative acceleration in gs
     upper_limit_acceleration = 5            # Highest positive acceleration in gs
+    lower_limit_v_vert = -10                # Highest negative vertical velocity in km/s
+    upper_limit_v_vert = 10                 # Highest positive vertical velocity in km/s
     # General settings #######################################################################
     mean_of_last = 10                       # Mean value of last n acceleration values
     every_n = 15                            # Only analyse every nth frame
@@ -42,7 +44,7 @@ def get_falcon_data(arguments):
 
     video = pafy.new(url)
 
-    t, v, h, a, a_mean = [[], []], [[], []], [[], []], [[], []], [[], []]
+    t, v, h, a, v_vert, a_mean = [[], []], [[], []], [[], []], [[], []], [[], []], [[], []]
 
     plt.ion()
     fig1, ax1 = plt.subplots()
@@ -142,6 +144,7 @@ def get_falcon_data(arguments):
                 v_frame = None
                 h_frame = None
 
+            # Calculate acceleration
             try:
                 n = False
                 m = 0
@@ -156,10 +159,25 @@ def get_falcon_data(arguments):
             except IndexError:
                 a_frame = 0
 
-            if a_frame is not None and lower_limit_acceleration <= a_frame <= upper_limit_acceleration:
+            # Calculate vertical velocity
+            try:
+                n = False
+                m = 0
+                while n is False:
+                    m += 1
+                    if not [x for x in (h[stage - 1][-m], t[stage - 1][-m], h_frame, t_frame) if x is None]:
+                        v_vert_frame = (h_frame - h[stage - 1][-m]) / (t_frame - t[stage - 1][-m])
+                        n = True
+                    elif [x for x in (h_frame, t_frame) if x is None]:
+                        v_vert_frame = None
+                        n = True
+            except IndexError:
+                v_vert_frame = 0
+
+            if a_frame is not None and lower_limit_acceleration <= a_frame <= upper_limit_acceleration and lower_limit_v_vert <= v_vert_frame <= upper_limit_v_vert:
                 if stage == 2 and v_frame is not None:
                     try:
-                        if v_frame < v[0][-1]:
+                        if v_frame < v[0][-1] or h_frame < h[0][-1]:
                             continue
                     except IndexError:
                         continue
@@ -168,6 +186,7 @@ def get_falcon_data(arguments):
                 v[stage - 1].append(v_frame)
                 h[stage - 1].append(h_frame)
                 a[stage - 1].append(a_frame)
+                v_vert[stage - 1].append(v_vert_frame)
 
                 try:
                     n = 0
