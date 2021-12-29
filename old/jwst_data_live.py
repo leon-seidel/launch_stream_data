@@ -22,8 +22,8 @@ def get_rocket_data(arguments):
 
     ##################################################################################################################
     # Plot settings ##################################################################################################
-    upper_limit_velo_plot = 30000           # Upper limit of velocity plot
-    upper_limit_alti_plot = 250             # Upper limit of altitude plot
+    upper_limit_velo_plot = 38000           # Upper limit of velocity plot
+    upper_limit_alti_plot = 1500            # Upper limit of altitude plot
     lower_limit_acc_plot = -5               # Lower limit of acceleration plot
     upper_limit_acc_plot = 5                # Upper limit of acceleration plot
     # Outlier prevention #############################################################################################
@@ -31,7 +31,7 @@ def get_rocket_data(arguments):
     upper_limit_acc = 5                     # Highest positive acceleration in gs
     lower_limit_v_vert = -10                # Highest negative vertical velocity in km/s
     upper_limit_v_vert = 10                 # Highest positive vertical velocity in km/s
-    mean_of_last = 10                       # Mean value of last n acceleration values
+    mean_of_last = 25                       # Mean value of last n acceleration values
     # General settings ###############################################################################################
     every_n = 15                            # Only analyse every nth frame
     fps = 30                                # Video frames per second
@@ -116,8 +116,6 @@ def get_rocket_data(arguments):
                             continue
                     except IndexError:
                         continue
-                    except TypeError:
-                        continue
 
                 t[stage - 1].append(t_frame)
                 v[stage - 1].append(v_frame)
@@ -130,13 +128,6 @@ def get_rocket_data(arguments):
                 a_mean[stage - 1].append(a_frame_mean)
 
                 print("Stage", stage, ": t=", t_frame, "s, v=", v_frame, "kph, h=", h_frame, "km, a=", a_frame, "gs")
-            else:
-                t[stage - 1].append(None)
-                v[stage - 1].append(None)
-                h[stage - 1].append(None)
-                a[stage - 1].append(None)
-                v_vert[stage - 1].append(None)
-                a_mean[stage - 1].append(None)
 
         time_passed = time.time() - start_time
         average_fps = frame_number / time_passed
@@ -356,21 +347,19 @@ def update_plots(number_of_stages, t, v, h, a_mean, fig, sc):
 def save_as_csv(t, v, h, a_mean, number_of_stages, video_title):
     file_dir = os.path.dirname(os.path.abspath(__file__))
     csv_folder = 'mission_data'
-    csv_filename = os.path.join(file_dir, csv_folder, "".join(x for x in video_title if x.isalnum()), ".csv")
+    csv_filename = os.path.join(file_dir, csv_folder, "".join(x for x in video_title if x.isalnum()))
 
-    if number_of_stages == 1:
-        column_names = ["t", "v", "h", "a"]
-        df_list = list(zip(t[0], v[0], h[0], a_mean[0]))
-    elif number_of_stages == 2:
-        column_names = ["t", "v1", "h1", "a1", "v2", "h2", "a2"]
-        df_list = list(zip(t[0], v[0], h[0], a_mean[0], v[1], h[1], a_mean[1]))
-    else:
-        df_list, column_names = None, None
-        print("Writing a csv of more than two stages is not supported.")
-        quit()
+    column_names = ["t", "v", "h", "a"]
 
-    df = pd.DataFrame(df_list, columns=column_names)
-    df.to_csv(csv_filename, index=False)
+    for stage in range(1, number_of_stages + 1):
+        df = pd.DataFrame(list(zip(t[stage - 1], v[stage - 1], h[stage - 1], a_mean[0])), columns=column_names)
+
+        if number_of_stages == 1:
+            csv_filename_stage = csv_filename + ".csv"
+        else:
+            csv_filename_stage = csv_filename + "_stage" + str(stage) + ".csv"
+
+        df.to_csv(csv_filename_stage, index=False)
 
     print("Saved data!")
 
