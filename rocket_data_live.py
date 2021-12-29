@@ -115,8 +115,20 @@ def get_rocket_data(arguments):
                         if v_frame < v[0][-1] or h_frame < h[0][-1]:
                             continue
                     except IndexError:
+                        t[stage - 1].append(None)
+                        v[stage - 1].append(None)
+                        h[stage - 1].append(None)
+                        a[stage - 1].append(None)
+                        v_vert[stage - 1].append(None)
+                        a_mean[stage - 1].append(None)
                         continue
                     except TypeError:
+                        t[stage - 1].append(None)
+                        v[stage - 1].append(None)
+                        h[stage - 1].append(None)
+                        a[stage - 1].append(None)
+                        v_vert[stage - 1].append(None)
+                        a_mean[stage - 1].append(None)
                         continue
 
                 t[stage - 1].append(t_frame)
