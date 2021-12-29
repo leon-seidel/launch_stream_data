@@ -1,6 +1,7 @@
-# Arguments --url (Video URL), --start (Start time in video in seconds), --end (End time in video in seconds)
+# Arguments --url (Video URL), --start (Start time in video in seconds), --end (End time in video, supported formats:
+# 1:13:12, 3:12, 144 (h:min:s, min:s, s))
 #
-# Example: python rocket_data_live.py --url https://www.youtube.com/watch?v=JBGjE9_aosc --start 1193 --end 1724
+# Example: python rocket_data_live.py --url https://www.youtube.com/watch?v=JBGjE9_aosc --start 19:53 --end 28:24
 
 import os
 import re
@@ -44,8 +45,7 @@ def get_rocket_data(arguments):
     ##################################################################################################################
 
     url = arguments.url
-    video_start_time = arguments.start
-    video_end_time = arguments.end
+    video_start_time, video_end_time = get_video_times(arguments)
 
     video = pafy.new(url)
     video_title = video.title
@@ -139,6 +139,33 @@ def get_rocket_data(arguments):
     cv2.destroyAllWindows()
 
     save_as_csv(t, v, h, a_mean, number_of_stages, video_title)
+
+
+def get_video_times(arguments):
+
+    video_start_time, video_end_time = 0, 0
+
+    if ":" in arguments.start:
+        time_list_1 = arguments.start.split(":")
+
+        if len(time_list_1) == 2:
+            video_start_time = float(time_list_1[0]) * 60 + float(time_list_1[1])
+        if len(time_list_1) == 3:
+            video_start_time = float(time_list_1[0]) * 3600 + float(time_list_1[1]) * 60 + float(time_list_1[2])
+    else:
+        video_start_time = float(arguments.start)
+
+    if ":" in arguments.end:
+        time_list_2 = arguments.end.split(":")
+
+        if len(time_list_2) == 2:
+            video_end_time = float(time_list_2[0]) * 60 + float(time_list_2[1])
+        if len(time_list_2) == 3:
+            video_end_time = float(time_list_2[0]) * 3600 + float(time_list_2[1]) * 60 + float(time_list_2[2])
+    else:
+        video_end_time = float(arguments.end)
+
+    return video_start_time, video_end_time
 
 
 def start_plots(number_of_stages, video_title, video_start_time, video_end_time, upper_limit_velo_plot,
@@ -326,8 +353,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Read and plot data from SpaceX F9 and Rocket Lab Electron starts')
 
     parser.add_argument('--url', nargs='?', type=str, help='Video URL')
-    parser.add_argument('--start', nargs='?', type=float, help='Start time in video (seconds)')
-    parser.add_argument('--end', nargs='?', type=float, help='End time in video (seconds)')
+    parser.add_argument('--start', nargs='?', type=str, help='Video start time, supported formats: 1:13:12, 3:12, 144')
+    parser.add_argument('--end', nargs='?', type=str, help='Video end time, supported formats: 1:13:12, 3:12, 144')
 
     args = parser.parse_args()
 
@@ -335,9 +362,9 @@ if __name__ == '__main__':
         print("Pleade add an URL with --url https://www.youtube.com/watch?v=JBGjE9_aosc")
         quit()
     if args.start is None:
-        args.start = 0
+        args.start = "0"
     if args.end is None:
-        print("Pleade add an end time in video in seconds with --end 400")
+        print("Pleade add an end time in video, supported formats: 1:13:12, 3:12, 144")
         quit()
 
     get_rocket_data(args)
