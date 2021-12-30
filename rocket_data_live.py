@@ -368,7 +368,7 @@ def update_plots(number_of_stages, t, v, h, a_mean, fig, sc):
 def save_as_csv(t, v, h, a_mean, number_of_stages, video_title):
     file_dir = os.path.dirname(os.path.abspath(__file__))
     csv_folder = 'mission_data'
-    csv_filename = os.path.join(file_dir, csv_folder, "".join(x for x in video_title if x.isalnum()), ".csv")
+    csv_filename = os.path.join(file_dir, csv_folder, "".join(x for x in video_title if x.isalnum()) + ".csv")
 
     if number_of_stages == 1:
         column_names = ["t", "v", "h", "a"]
