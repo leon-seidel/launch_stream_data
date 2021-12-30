@@ -6,8 +6,9 @@
 import os
 import re
 import cv2
-import pafy                 # Install with: pip install git+https://github.com/Cupcakus/pafy
+import pafy  # Install with: pip install git+https://github.com/Cupcakus/pafy
 import time
+import math
 import argparse
 import pytesseract
 import numpy as np
@@ -22,31 +23,32 @@ def get_rocket_data(arguments):
 
     ##################################################################################################################
     # Plot settings ##################################################################################################
-    upper_limit_velo_plot = 30000           # Upper limit of velocity plot
-    upper_limit_alti_plot = 250             # Upper limit of altitude plot
-    lower_limit_acc_plot = -5               # Lower limit of acceleration plot
-    upper_limit_acc_plot = 5                # Upper limit of acceleration plot
+    upper_limit_velo_plot = 30000  # Upper limit of velocity plot
+    upper_limit_alti_plot = 250  # Upper limit of altitude plot
+    lower_limit_acc_plot = -5  # Lower limit of acceleration plot
+    upper_limit_acc_plot = 5  # Upper limit of acceleration plot
+    length_live_video = 500                 # Length of live video plot in seconds
     # Outlier prevention #############################################################################################
-    lower_limit_acc = -5                    # Highest negative acceleration in gs
-    upper_limit_acc = 5                     # Highest positive acceleration in gs
-    lower_limit_v_vert = -10                # Highest negative vertical velocity in km/s
-    upper_limit_v_vert = 10                 # Highest positive vertical velocity in km/s
-    mean_of_last = 10                       # Mean value of last n acceleration values
+    lower_limit_acc = -5  # Highest negative acceleration in gs
+    upper_limit_acc = 5  # Highest positive acceleration in gs
+    lower_limit_v_vert = -10  # Highest negative vertical velocity in km/s
+    upper_limit_v_vert = 10  # Highest positive vertical velocity in km/s
+    mean_of_last = 10  # Mean value of last n acceleration values
     # General settings ###############################################################################################
-    every_n = 15                            # Only analyse every nth frame
-    fps = 30                                # Video frames per second
+    every_n = 30  # Only analyse every nth frame
+    fps = 30  # Video frames per second
     # Telemetry data source, contains [y_start, y_end, x_start, x_end] of the bounding box ###########################
-    f9_stage1 = [640, 670, 68, 264]         # Position of telemetry data in 720p video feed (Falcon 9, stage 1)
-    f9_stage2 = [640, 670, 1016, 1207]      # Position of telemetry data in 720p video feed (Falcon 9, stage 2)
-    rocketlab = [35, 55, 976, 1124]         # Position of telemetry data in 720p video feed (Rocket Lab Electron)
-    jwst = [542, 685, 170, 248]             # Position of telemetry data in 720p video feed (JWST stream Arianespace)
+    f9_stage1 = [640, 670, 68, 264]  # Position of telemetry data in 720p video feed (Falcon 9, stage 1)
+    f9_stage2 = [640, 670, 1016, 1207]  # Position of telemetry data in 720p video feed (Falcon 9, stage 2)
+    rocketlab = [35, 55, 976, 1124]  # Position of telemetry data in 720p video feed (Rocket Lab Electron)
+    jwst = [542, 685, 170, 248]  # Position of telemetry data in 720p video feed (JWST stream Arianespace)
     # Setup 0 values #################################################################################################
-    tf = 0                                  # Time between video start and T0
-    frame_number = 0                        # Number of frame
+    tf = 0  # Time between video start and T0
+    frame_number = 0  # Number of frame
     ##################################################################################################################
 
     url = arguments.url
-    video_start_time, video_end_time = get_video_times(arguments)
+    video_start_time, video_end_time, is_live = get_video_times(arguments)
 
     video = pafy.new(url)
     video_title = video.title
@@ -60,29 +62,38 @@ def get_rocket_data(arguments):
         pos_stage = [rocketlab]
     elif video_author == "arianespace":
         pos_stage = [jwst]
+    elif video_author == "Golf Oscar Romeo":
+        pos_stage = [f9_stage1, f9_stage2]
     else:
         pos_stage = None
         print("Youtube channel " + video_author + " not supported.")
         quit()
 
-    number_of_stages = len(pos_stage)       # Number of rocket stages with data
+    number_of_stages = len(pos_stage)  # Number of rocket stages with data
 
     fig, ax, sc = start_plots(number_of_stages, video_title, video_start_time, video_end_time, upper_limit_velo_plot,
-                              upper_limit_alti_plot, upper_limit_acc_plot, lower_limit_acc_plot, t, v, h, a_mean)
+                              upper_limit_alti_plot, upper_limit_acc_plot, lower_limit_acc_plot, length_live_video,
+                              t, v, h, a_mean)
 
-    stream_720mp4 = None
+    stream_720 = None
 
-    for stream in video.allstreams:
-        if stream.resolution == "1280x720" and stream.extension == "webm":
-            stream_720mp4 = stream
+    if is_live is True:
+        for stream in video.allstreams:
+            if stream.resolution == "1280x720" and stream.extension == "mp4":
+                stream_720 = stream
+    else:
+        for stream in video.allstreams:
+            if stream.resolution == "1280x720" and stream.extension == "webm":
+                stream_720 = stream
 
-    if stream_720mp4 is None:
-        print("No 720p mp4 stream found")
+    if stream_720 is None:
+        print("No adequate 720p stream found")
         quit()
 
-    cap = cv2.VideoCapture(stream_720mp4.url)
+    cap = cv2.VideoCapture(stream_720.url)
 
-    cap.set(cv2.CAP_PROP_POS_MSEC, video_start_time * 1000)
+    if is_live is False:
+        cap.set(cv2.CAP_PROP_POS_MSEC, video_start_time * 1000)
 
     start_time = time.time()
 
@@ -168,33 +179,40 @@ def get_rocket_data(arguments):
 
 def get_video_times(arguments):
 
-    video_start_time, video_end_time = 0, 0
+    video_start_time, video_end_time, is_live = 0, 0, False
 
-    if ":" in arguments.start:
-        time_list_1 = arguments.start.split(":")
+    if arguments.start == "live":
+        is_live = True
+        video_end_time = math.inf
+        return video_start_time, video_end_time, is_live
 
-        if len(time_list_1) == 2:
-            video_start_time = float(time_list_1[0]) * 60 + float(time_list_1[1])
-        if len(time_list_1) == 3:
-            video_start_time = float(time_list_1[0]) * 3600 + float(time_list_1[1]) * 60 + float(time_list_1[2])
     else:
-        video_start_time = float(arguments.start)
 
-    if ":" in arguments.end:
-        time_list_2 = arguments.end.split(":")
+        if ":" in arguments.start:
+            time_list_1 = arguments.start.split(":")
 
-        if len(time_list_2) == 2:
-            video_end_time = float(time_list_2[0]) * 60 + float(time_list_2[1])
-        if len(time_list_2) == 3:
-            video_end_time = float(time_list_2[0]) * 3600 + float(time_list_2[1]) * 60 + float(time_list_2[2])
-    else:
-        video_end_time = float(arguments.end)
+            if len(time_list_1) == 2:
+                video_start_time = float(time_list_1[0]) * 60 + float(time_list_1[1])
+            if len(time_list_1) == 3:
+                video_start_time = float(time_list_1[0]) * 3600 + float(time_list_1[1]) * 60 + float(time_list_1[2])
+        else:
+            video_start_time = float(arguments.start)
 
-    return video_start_time, video_end_time
+        if ":" in arguments.end:
+            time_list_2 = arguments.end.split(":")
+
+            if len(time_list_2) == 2:
+                video_end_time = float(time_list_2[0]) * 60 + float(time_list_2[1])
+            if len(time_list_2) == 3:
+                video_end_time = float(time_list_2[0]) * 3600 + float(time_list_2[1]) * 60 + float(time_list_2[2])
+        else:
+            video_end_time = float(arguments.end)
+
+        return video_start_time, video_end_time, is_live
 
 
 def start_plots(number_of_stages, video_title, video_start_time, video_end_time, upper_limit_velo_plot,
-                upper_limit_alti_plot, upper_limit_acc_plot, lower_limit_acc_plot, t, v, h, a_mean):
+                upper_limit_alti_plot, upper_limit_acc_plot, lower_limit_acc_plot, length_live_video, t, v, h, a_mean):
 
     fig, ax, sc = [], [], [[], [], []]
 
@@ -210,7 +228,12 @@ def start_plots(number_of_stages, video_title, video_start_time, video_end_time,
             plt.legend(["Stage 1", "Stage 2"])
 
     plt.title(video_title + ": Time vs. velocity")
-    plt.xlim(0, video_end_time - video_start_time)
+
+    if video_start_time is not None and video_end_time is not None and video_end_time is not math.inf:
+        plt.xlim(0, video_end_time - video_start_time)
+    else:
+        plt.xlim(0, length_live_video)
+
     plt.ylim(0, upper_limit_velo_plot)
     plt.xlabel("Time in s")
     plt.ylabel("Velocity in kph")
@@ -229,7 +252,12 @@ def start_plots(number_of_stages, video_title, video_start_time, video_end_time,
             plt.legend(["Stage 1", "Stage 2"])
 
     plt.title(video_title + ": Time vs. altitude")
-    plt.xlim(0, video_end_time - video_start_time)
+
+    if video_start_time is not None and video_end_time is not None and video_end_time is not math.inf:
+        plt.xlim(0, video_end_time - video_start_time)
+    else:
+        plt.xlim(0, length_live_video)
+
     plt.ylim(0, upper_limit_alti_plot)
     plt.xlabel("Time in s")
     plt.ylabel("Altitude in km")
@@ -248,7 +276,12 @@ def start_plots(number_of_stages, video_title, video_start_time, video_end_time,
             plt.legend(["Stage 1", "Stage 2"])
 
     plt.title(video_title + ": Time vs. acceleration")
-    plt.xlim(0, video_end_time - video_start_time)
+
+    if video_start_time is not None and video_end_time is not None and video_end_time is not math.inf:
+        plt.xlim(0, video_end_time - video_start_time)
+    else:
+        plt.xlim(0, length_live_video)
+
     plt.ylim(lower_limit_acc_plot, upper_limit_acc_plot)
     plt.xlabel("Time in s")
     plt.ylabel("Acceleration in gs")
@@ -259,6 +292,7 @@ def start_plots(number_of_stages, video_title, video_start_time, video_end_time,
 
 
 def get_text_from_frame(video_author, frame, pos_stage, stage):
+
     cropped = frame[pos_stage[stage - 1][0]:pos_stage[stage - 1][1], pos_stage[stage - 1][2]:pos_stage[stage - 1][3]]
 
     gray = cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY)
@@ -298,6 +332,7 @@ def get_text_from_frame(video_author, frame, pos_stage, stage):
 
 
 def calculate_acc(t, v, t_frame, v_frame, stage):
+
     try:
         m = 0
         while True:
@@ -314,6 +349,7 @@ def calculate_acc(t, v, t_frame, v_frame, stage):
 
 
 def calculate_v_vert(t, h, t_frame, h_frame, stage):
+
     try:
         m = 0
         while True:
@@ -330,6 +366,7 @@ def calculate_v_vert(t, h, t_frame, h_frame, stage):
 
 
 def calculate_a_mean(a, stage, mean_of_last):
+
     try:
         n = 0
         m = 0
@@ -349,6 +386,7 @@ def calculate_a_mean(a, stage, mean_of_last):
 
 
 def update_plots(number_of_stages, t, v, h, a_mean, fig, sc):
+
     for stage in range(1, number_of_stages + 1):
         sc[0][stage - 1].set_offsets(np.c_[t[stage - 1], v[stage - 1]])
     fig[0].canvas.draw_idle()
@@ -366,6 +404,7 @@ def update_plots(number_of_stages, t, v, h, a_mean, fig, sc):
 
 
 def save_as_csv(t, v, h, a_mean, number_of_stages, video_title):
+
     file_dir = os.path.dirname(os.path.abspath(__file__))
     csv_folder = 'mission_data'
     csv_filename = os.path.join(file_dir, csv_folder, "".join(x for x in video_title if x.isalnum()) + ".csv")
@@ -388,6 +427,7 @@ def save_as_csv(t, v, h, a_mean, number_of_stages, video_title):
 
 
 if __name__ == '__main__':
+
     parser = argparse.ArgumentParser(description='Read and plot data from SpaceX F9 and Rocket Lab Electron starts')
 
     parser.add_argument('--url', nargs='?', type=str, help='Video URL')
@@ -401,7 +441,7 @@ if __name__ == '__main__':
         quit()
     if args.start is None:
         args.start = "0"
-    if args.end is None:
+    if args.end is None and args.start != "live":
         print("Pleade add an end time in video, supported formats: 1:13:12, 3:12, 144")
         quit()
 
