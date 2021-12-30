@@ -1,12 +1,13 @@
 # Arguments --url (Video URL), --start (Start time in video in seconds), --end (End time in video, supported formats:
-# 1:13:12, 3:12, 144 (h:min:s, min:s, s))
+# 1:13:12, 3:12, 144 (h:min:s, min:s, s)). For livestreams just use -- start live
 #
-# Example: python rocket_data_live.py --url https://www.youtube.com/watch?v=JBGjE9_aosc --start 19:53 --end 28:24
+# Example 1: python rocket_data_live.py --url https://www.youtube.com/watch?v=JBGjE9_aosc --start 19:53 --end 28:24
+# Example 2: python rocket_data_live.py --url https://www.youtube.com/watch?v=JBGjE9_aosc --start live
 
 import os
 import re
 import cv2
-import pafy  # Install with: pip install git+https://github.com/Cupcakus/pafy
+import pafy                             # Install with: pip install git+https://github.com/Cupcakus/pafy
 import time
 import math
 import argparse
@@ -23,25 +24,25 @@ def get_rocket_data(arguments):
 
     ##################################################################################################################
     # Plot settings ##################################################################################################
-    upper_limit_velo_plot = 30000  # Upper limit of velocity plot
-    upper_limit_alti_plot = 250  # Upper limit of altitude plot
-    lower_limit_acc_plot = -5  # Lower limit of acceleration plot
-    upper_limit_acc_plot = 5  # Upper limit of acceleration plot
+    upper_limit_velo_plot = 30000           # Upper limit of velocity plot
+    upper_limit_alti_plot = 250             # Upper limit of altitude plot
+    lower_limit_acc_plot = -5               # Lower limit of acceleration plot
+    upper_limit_acc_plot = 5                # Upper limit of acceleration plot
     length_live_video = 500                 # Length of live video plot in seconds
     # Outlier prevention #############################################################################################
-    lower_limit_acc = -5  # Highest negative acceleration in gs
-    upper_limit_acc = 5  # Highest positive acceleration in gs
-    lower_limit_v_vert = -10  # Highest negative vertical velocity in km/s
-    upper_limit_v_vert = 10  # Highest positive vertical velocity in km/s
-    mean_of_last = 10  # Mean value of last n acceleration values
+    lower_limit_acc = -5                    # Highest negative acceleration in gs
+    upper_limit_acc = 5                     # Highest positive acceleration in gs
+    lower_limit_v_vert = -10                # Highest negative vertical velocity in km/s
+    upper_limit_v_vert = 10                 # Highest positive vertical velocity in km/s
+    mean_of_last = 10                       # Mean value of last n acceleration values
     # General settings ###############################################################################################
-    every_n = 30  # Only analyse every nth frame
-    fps = 30  # Video frames per second
+    every_n = 15                            # Only analyse every nth frame
+    fps = 30                                # Video frames per second
     # Telemetry data source, contains [y_start, y_end, x_start, x_end] of the bounding box ###########################
-    f9_stage1 = [640, 670, 68, 264]  # Position of telemetry data in 720p video feed (Falcon 9, stage 1)
-    f9_stage2 = [640, 670, 1016, 1207]  # Position of telemetry data in 720p video feed (Falcon 9, stage 2)
-    rocketlab = [35, 55, 976, 1124]  # Position of telemetry data in 720p video feed (Rocket Lab Electron)
-    jwst = [542, 685, 170, 248]  # Position of telemetry data in 720p video feed (JWST stream Arianespace)
+    f9_stage1 = [640, 670, 68, 264]         # Position of telemetry data in 720p video feed (Falcon 9, stage 1)
+    f9_stage2 = [640, 670, 1016, 1207]      # Position of telemetry data in 720p video feed (Falcon 9, stage 2)
+    rocketlab = [35, 55, 976, 1124]         # Position of telemetry data in 720p video feed (Rocket Lab Electron)
+    jwst = [542, 685, 170, 248]             # Position of telemetry data in 720p video feed (JWST stream Arianespace)
     # Setup 0 values #################################################################################################
     tf = 0  # Time between video start and T0
     frame_number = 0  # Number of frame
@@ -431,8 +432,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Read and plot data from SpaceX F9 and Rocket Lab Electron starts')
 
     parser.add_argument('--url', nargs='?', type=str, help='Video URL')
-    parser.add_argument('--start', nargs='?', type=str, help='Video start time, supported formats: 1:13:12, 3:12, 144')
-    parser.add_argument('--end', nargs='?', type=str, help='Video end time, supported formats: 1:13:12, 3:12, 144')
+    parser.add_argument('--start', nargs='?', type=str, help='Video start time, formats: 1:13:12, 3:12, 144, live')
+    parser.add_argument('--end', nargs='?', type=str, help='Video end time, formats: 1:13:12, 3:12, 144')
 
     args = parser.parse_args()
 
@@ -442,7 +443,7 @@ if __name__ == '__main__':
     if args.start is None:
         args.start = "0"
     if args.end is None and args.start != "live":
-        print("Pleade add an end time in video, supported formats: 1:13:12, 3:12, 144")
+        print("Pleade add an end time in video or declare --start live, supported formats: 1:13:12, 3:12, 144")
         quit()
 
     get_rocket_data(args)
