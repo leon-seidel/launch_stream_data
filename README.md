@@ -1,6 +1,13 @@
 # Plot rocket data from YouTube streams
 Using PyTesseract for extracting the telemetry data from SpaceX, Rocket Lab and Arianespace launch streams.
+Velocity, altitude and acceleration are then plotted for each stage (SpaceX) or for the main stage (Rocket Lab, Arianespace).
+The rocket type is determined by the YouTube channel name, supporting the above rocket launchers.
+Outliers are detected and ignored by applying acceleration and vertical speed boundaries.
+Realtime performance can be reached by only analysing every nth frame, parallelisation is not possible yet.
 
+![Velocity plot](examples/velo.png?raw=true)
+![Altitude plot](examples/alti.png?raw=true)
+![Acceleration plot](examples/acc.png?raw=true)
 
 ### Arguments
 Arguments: `--url` (Video URL), `--start` (Start time in video in seconds), `--end` (End time in video, supported formats:
