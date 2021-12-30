@@ -35,10 +35,9 @@ def get_rocket_data(arguments):
     lower_limit_v_vert = -10                # Highest negative vertical velocity in km/s
     upper_limit_v_vert = 10                 # Highest positive vertical velocity in km/s
     mean_of_last = 10                       # Mean value of last n acceleration values
-    # General settings ###############################################################################################
     every_n = 15                            # Only analyse every nth frame
-    fps = 30                                # Video frames per second
-    # Telemetry data source, contains [y_start, y_end, x_start, x_end] of the bounding box ###########################
+    # Telemetry data sources #########################################################################################
+    # contains [y_start, y_end, x_start, x_end] of the bounding box ##################################################
     f9_stage1 = [640, 670, 68, 264]         # Position of telemetry data in 720p video feed (Falcon 9, stage 1)
     f9_stage2 = [640, 670, 1016, 1207]      # Position of telemetry data in 720p video feed (Falcon 9, stage 2)
     rocketlab = [35, 55, 976, 1124]         # Position of telemetry data in 720p video feed (Rocket Lab Electron)
@@ -92,6 +91,8 @@ def get_rocket_data(arguments):
         quit()
 
     cap = cv2.VideoCapture(stream_720.url)
+
+    fps = cap.get(cv2.CAP_PROP_FPS)
 
     if is_live is False:
         cap.set(cv2.CAP_PROP_POS_MSEC, video_start_time * 1000)
