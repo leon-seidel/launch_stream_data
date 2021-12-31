@@ -1,14 +1,16 @@
-# Arguments --url (Video URL), --start (Start time in video in seconds), --end (End time in video, supported formats:
-# 1:13:12, 3:12, 144 (h:min:s, min:s, s))
+# Get live data and plots from rocket launch live streams
 #
-# Example: python rocket_data_live.py --url https://www.youtube.com/watch?v=JBGjE9_aosc --start 19:53 --end 28:24
+# Arguments: --url (Video URL), --start (Start time in video), --duration (Duration of video from start time), supported
+# formats: 1:13:12, 3:12, 144 (h:min:s, min:s, s)). For livestreams just use -- start live and a duration.
+#
+# Example 1: python rocket_data_live.py --url https://www.youtube.com/watch?v=JBGjE9_aosc --start 19:53 --duration 8:24
+# Example 2: python rocket_data_live.py --url https://www.youtube.com/watch?v=JBGjE9_aosc --start live --duration 8:45
 
 import os
 import re
 import cv2
-import pafy  # Install with: pip install git+https://github.com/Cupcakus/pafy
+import pafy                             # Install with: pip install git+https://github.com/Cupcakus/pafy
 import time
-import math
 import argparse
 import pytesseract
 import numpy as np
@@ -23,32 +25,28 @@ def get_rocket_data(arguments):
 
     ##################################################################################################################
     # Plot settings ##################################################################################################
-    upper_limit_velo_plot = 30000  # Upper limit of velocity plot
-    upper_limit_alti_plot = 250  # Upper limit of altitude plot
-    lower_limit_acc_plot = -5  # Lower limit of acceleration plot
-    upper_limit_acc_plot = 5  # Upper limit of acceleration plot
-    length_live_video = 500                 # Length of live video plot in seconds
+    upper_limit_velo_plot = 30000           # Upper limit of velocity plot
+    upper_limit_alti_plot = 250             # Upper limit of altitude plot
+    lower_limit_acc_plot = -5               # Lower limit of acceleration plot
+    upper_limit_acc_plot = 5                # Upper limit of acceleration plot
     # Outlier prevention #############################################################################################
-    lower_limit_acc = -5  # Highest negative acceleration in gs
-    upper_limit_acc = 5  # Highest positive acceleration in gs
-    lower_limit_v_vert = -10  # Highest negative vertical velocity in km/s
-    upper_limit_v_vert = 10  # Highest positive vertical velocity in km/s
-    mean_of_last = 10  # Mean value of last n acceleration values
-    # General settings ###############################################################################################
-    every_n = 30  # Only analyse every nth frame
-    fps = 30  # Video frames per second
-    # Telemetry data source, contains [y_start, y_end, x_start, x_end] of the bounding box ###########################
-    f9_stage1 = [640, 670, 68, 264]  # Position of telemetry data in 720p video feed (Falcon 9, stage 1)
-    f9_stage2 = [640, 670, 1016, 1207]  # Position of telemetry data in 720p video feed (Falcon 9, stage 2)
-    rocketlab = [35, 55, 976, 1124]  # Position of telemetry data in 720p video feed (Rocket Lab Electron)
-    jwst = [542, 685, 170, 248]  # Position of telemetry data in 720p video feed (JWST stream Arianespace)
-    # Setup 0 values #################################################################################################
-    tf = 0  # Time between video start and T0
-    frame_number = 0  # Number of frame
+    lower_limit_acc = -5                    # Highest negative acceleration in gs
+    upper_limit_acc = 5                     # Highest positive acceleration in gs
+    lower_limit_v_vert = -10                # Highest negative vertical velocity in km/s
+    upper_limit_v_vert = 10                 # Highest positive vertical velocity in km/s
+    mean_of_last = 10                       # Mean value of last n acceleration values
+    every_n = 15                            # Only analyse every nth frame
+    # Telemetry data sources #########################################################################################
+    # contains [y_start, y_end, x_start, x_end] of the bounding box ##################################################
+    f9_stage1 = [640, 670, 68, 264]         # Position of telemetry data in 720p video feed (Falcon 9, stage 1)
+    f9_stage2 = [640, 670, 1016, 1207]      # Position of telemetry data in 720p video feed (Falcon 9, stage 2)
+    rocketlab = [35, 55, 976, 1124]         # Position of telemetry data in 720p video feed (Rocket Lab Electron)
+    jwst = [542, 685, 170, 248]             # Position of telemetry data in 720p video feed (JWST stream Arianespace)
+    labpadre = [0, 30, 1140, 1205]
     ##################################################################################################################
 
     url = arguments.url
-    video_start_time, video_end_time, is_live = get_video_times(arguments)
+    video_start_time, video_end_time, video_duration, is_live = get_video_times(arguments)
 
     video = pafy.new(url)
     video_title = video.title
@@ -62,8 +60,8 @@ def get_rocket_data(arguments):
         pos_stage = [rocketlab]
     elif video_author == "arianespace":
         pos_stage = [jwst]
-    elif video_author == "Golf Oscar Romeo":
-        pos_stage = [f9_stage1, f9_stage2]
+    elif video_author == "LabPadre":
+        pos_stage = [labpadre]
     else:
         pos_stage = None
         print("Youtube channel " + video_author + " not supported.")
@@ -71,9 +69,8 @@ def get_rocket_data(arguments):
 
     number_of_stages = len(pos_stage)  # Number of rocket stages with data
 
-    fig, ax, sc = start_plots(number_of_stages, video_title, video_start_time, video_end_time, upper_limit_velo_plot,
-                              upper_limit_alti_plot, upper_limit_acc_plot, lower_limit_acc_plot, length_live_video,
-                              t, v, h, a_mean)
+    fig, ax, sc = start_plots(number_of_stages, video_title, upper_limit_velo_plot, upper_limit_alti_plot,
+                              upper_limit_acc_plot, lower_limit_acc_plot, video_duration, t, v, h, a_mean)
 
     stream_720 = None
 
@@ -92,12 +89,19 @@ def get_rocket_data(arguments):
 
     cap = cv2.VideoCapture(stream_720.url)
 
+    fps = cap.get(cv2.CAP_PROP_FPS)
+
     if is_live is False:
         cap.set(cv2.CAP_PROP_POS_MSEC, video_start_time * 1000)
+        true_video_end_time = video_end_time * 1000
+    else:
+        true_video_end_time = cap.get(cv2.CAP_PROP_POS_MSEC) + video_duration * 1000
 
     start_time = time.time()
+    frame_number = 0
+    tf = 0              # Time between video start and T0
 
-    while True and cap.get(cv2.CAP_PROP_POS_MSEC) <= video_end_time * 1000:
+    while True and cap.get(cv2.CAP_PROP_POS_MSEC) <= true_video_end_time:
 
         p = (frame_number / every_n) - (int(frame_number / every_n))
         frame_number += 1
@@ -179,40 +183,39 @@ def get_rocket_data(arguments):
 
 def get_video_times(arguments):
 
-    video_start_time, video_end_time, is_live = 0, 0, False
+    video_start_time, video_end_time, video_duration, is_live = 0, 0, 0, False
+
+    if ":" in arguments.duration:
+        duration_list = arguments.duration.split(":")
+
+        if len(duration_list) == 2:
+            video_duration = float(duration_list[0]) * 60 + float(duration_list[1])
+        if len(duration_list) == 3:
+            video_duration = float(duration_list[0]) * 3600 + float(duration_list[1]) * 60 + float(duration_list[2])
+    else:
+        video_duration = float(arguments.duration)
 
     if arguments.start == "live":
         is_live = True
-        video_end_time = math.inf
-        return video_start_time, video_end_time, is_live
-
+        video_end_time = video_duration
+        return video_start_time, video_end_time, video_duration, is_live
     else:
-
         if ":" in arguments.start:
-            time_list_1 = arguments.start.split(":")
+            start_list = arguments.start.split(":")
 
-            if len(time_list_1) == 2:
-                video_start_time = float(time_list_1[0]) * 60 + float(time_list_1[1])
-            if len(time_list_1) == 3:
-                video_start_time = float(time_list_1[0]) * 3600 + float(time_list_1[1]) * 60 + float(time_list_1[2])
+            if len(start_list) == 2:
+                video_start_time = float(start_list[0]) * 60 + float(start_list[1])
+            if len(start_list) == 3:
+                video_start_time = float(start_list[0]) * 3600 + float(start_list[1]) * 60 + float(start_list[2])
         else:
             video_start_time = float(arguments.start)
 
-        if ":" in arguments.end:
-            time_list_2 = arguments.end.split(":")
-
-            if len(time_list_2) == 2:
-                video_end_time = float(time_list_2[0]) * 60 + float(time_list_2[1])
-            if len(time_list_2) == 3:
-                video_end_time = float(time_list_2[0]) * 3600 + float(time_list_2[1]) * 60 + float(time_list_2[2])
-        else:
-            video_end_time = float(arguments.end)
-
-        return video_start_time, video_end_time, is_live
+        video_end_time = video_start_time + video_duration
+        return video_start_time, video_end_time, video_duration, is_live
 
 
-def start_plots(number_of_stages, video_title, video_start_time, video_end_time, upper_limit_velo_plot,
-                upper_limit_alti_plot, upper_limit_acc_plot, lower_limit_acc_plot, length_live_video, t, v, h, a_mean):
+def start_plots(number_of_stages, video_title, upper_limit_velo_plot, upper_limit_alti_plot, upper_limit_acc_plot,
+                lower_limit_acc_plot, video_duration, t, v, h, a_mean):
 
     fig, ax, sc = [], [], [[], [], []]
 
@@ -228,12 +231,7 @@ def start_plots(number_of_stages, video_title, video_start_time, video_end_time,
             plt.legend(["Stage 1", "Stage 2"])
 
     plt.title(video_title + ": Time vs. velocity")
-
-    if video_start_time is not None and video_end_time is not None and video_end_time is not math.inf:
-        plt.xlim(0, video_end_time - video_start_time)
-    else:
-        plt.xlim(0, length_live_video)
-
+    plt.xlim(0, video_duration)
     plt.ylim(0, upper_limit_velo_plot)
     plt.xlabel("Time in s")
     plt.ylabel("Velocity in kph")
@@ -252,12 +250,7 @@ def start_plots(number_of_stages, video_title, video_start_time, video_end_time,
             plt.legend(["Stage 1", "Stage 2"])
 
     plt.title(video_title + ": Time vs. altitude")
-
-    if video_start_time is not None and video_end_time is not None and video_end_time is not math.inf:
-        plt.xlim(0, video_end_time - video_start_time)
-    else:
-        plt.xlim(0, length_live_video)
-
+    plt.xlim(0, video_duration)
     plt.ylim(0, upper_limit_alti_plot)
     plt.xlabel("Time in s")
     plt.ylabel("Altitude in km")
@@ -276,12 +269,7 @@ def start_plots(number_of_stages, video_title, video_start_time, video_end_time,
             plt.legend(["Stage 1", "Stage 2"])
 
     plt.title(video_title + ": Time vs. acceleration")
-
-    if video_start_time is not None and video_end_time is not None and video_end_time is not math.inf:
-        plt.xlim(0, video_end_time - video_start_time)
-    else:
-        plt.xlim(0, length_live_video)
-
+    plt.xlim(0, video_duration)
     plt.ylim(lower_limit_acc_plot, upper_limit_acc_plot)
     plt.xlabel("Time in s")
     plt.ylabel("Acceleration in gs")
@@ -431,8 +419,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Read and plot data from SpaceX F9 and Rocket Lab Electron starts')
 
     parser.add_argument('--url', nargs='?', type=str, help='Video URL')
-    parser.add_argument('--start', nargs='?', type=str, help='Video start time, supported formats: 1:13:12, 3:12, 144')
-    parser.add_argument('--end', nargs='?', type=str, help='Video end time, supported formats: 1:13:12, 3:12, 144')
+    parser.add_argument('--start', nargs='?', type=str, help='Video start time, formats: 1:13:12, 3:12, 144, live')
+    parser.add_argument('--duration', nargs='?', type=str, help='Video duration, formats: 1:13:12, 3:12, 144')
 
     args = parser.parse_args()
 
@@ -441,8 +429,8 @@ if __name__ == '__main__':
         quit()
     if args.start is None:
         args.start = "0"
-    if args.end is None and args.start != "live":
-        print("Pleade add an end time in video, supported formats: 1:13:12, 3:12, 144")
+    if args.duration is None:
+        print("Pleade add a video duration, supported formats: 1:13:12, 3:12, 144")
         quit()
 
     get_rocket_data(args)
