@@ -23,6 +23,6 @@ Tesseract must be installed on the system and referenced, installation link for 
 
 ## Examples
 
-![Velocity plot](examples/velo.png?raw=true)
-![Altitude plot](examples/alti.png?raw=true)
-![Acceleration plot](examples/acc.png?raw=true)
+![Velocity plot](examples/dart_velo.png?raw=true)
+![Altitude plot](examples/inspiration4_alti.png?raw=true)
+![Acceleration plot](examples/inspiration4_acc.png?raw=true)

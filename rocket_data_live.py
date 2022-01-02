@@ -1,7 +1,7 @@
 # Get live data and plots from rocket launch live streams
 #
 # Arguments: --url (Video URL), --start (Start time in video), --duration (Duration of video from start time), supported
-# formats: 1:13:12, 3:12, 144 (h:min:s, min:s, s)). For livestreams just use -- start live and a duration.
+# formats: 1:13:12, 3:12, 144 (h:min:s, min:s, s)). For livestreams just use --start live and a duration.
 #
 # Example 1: python rocket_data_live.py --url https://www.youtube.com/watch?v=JBGjE9_aosc --start 19:53 --duration 8:24
 # Example 2: python rocket_data_live.py --url https://www.youtube.com/watch?v=JBGjE9_aosc --start live --duration 8:45
@@ -9,7 +9,7 @@
 import os
 import re
 import cv2
-import pafy  # Install with: pip install git+https://github.com/Cupcakus/pafy
+import pafy                             # Install with: pip install git+https://github.com/Cupcakus/pafy
 import time
 import argparse
 import pytesseract
@@ -23,6 +23,8 @@ pytesseract.pytesseract.tesseract_cmd = 'C:/Program Files/Tesseract-OCR/tesserac
 
 def get_rocket_data(arguments):
     ##################################################################################################################
+    # Performance ####################################################################################################
+    every_n = 15                            # Only analyse every nth frame
     # Plot settings ##################################################################################################
     upper_limit_velo_plot = 30000           # Upper limit of velocity plot
     upper_limit_alti_plot = 250             # Upper limit of altitude plot
@@ -34,7 +36,6 @@ def get_rocket_data(arguments):
     lower_limit_v_vert = -12                # Highest negative vertical velocity in km/s
     upper_limit_v_vert = 12                 # Highest positive vertical velocity in km/s
     mean_of_last = 10                       # Mean value of last n acceleration values
-    every_n = 15                            # Only analyse every nth frame
     # Telemetry data sources #########################################################################################
     # contains [y_start, y_end, x_start, x_end] of the bounding box ##################################################
     f9_stage1 = [640, 670, 68, 264]         # Position of telemetry data in 720p video feed (Falcon 9, stage 1)
