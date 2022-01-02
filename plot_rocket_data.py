@@ -6,7 +6,7 @@ import tkinter.filedialog
 from matplotlib import pyplot as plt
 
 Tk().withdraw()
-filename = tkinter.filedialog.askopenfilename() # show an "Open" dialog box and return the path to the selected file
+filename = tkinter.filedialog.askopenfilename()
 df = pd.read_csv(filename)
 
 plot_type = "scatter"

@@ -29,10 +29,10 @@ def get_rocket_data(arguments):
     lower_limit_acc_plot = -5               # Lower limit of acceleration plot
     upper_limit_acc_plot = 5                # Upper limit of acceleration plot
     # Outlier prevention #############################################################################################
-    lower_limit_acc = -5                    # Highest negative acceleration in gs
-    upper_limit_acc = 5                     # Highest positive acceleration in gs
-    lower_limit_v_vert = -10                # Highest negative vertical velocity in km/s
-    upper_limit_v_vert = 10                 # Highest positive vertical velocity in km/s
+    lower_limit_acc = -7                    # Highest negative acceleration in gs
+    upper_limit_acc = 7                     # Highest positive acceleration in gs
+    lower_limit_v_vert = -12                # Highest negative vertical velocity in km/s
+    upper_limit_v_vert = 12                 # Highest positive vertical velocity in km/s
     mean_of_last = 10                       # Mean value of last n acceleration values
     every_n = 15                            # Only analyse every nth frame
     # Telemetry data sources #########################################################################################
