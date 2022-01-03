@@ -31,8 +31,8 @@ def get_rocket_data(arguments):
     lower_limit_acc_plot = -6               # Lower limit of acceleration plot
     upper_limit_acc_plot = 6                # Upper limit of acceleration plot
     # Outlier prevention #############################################################################################
-    lower_limit_acc = -8                    # Highest negative acceleration in gs
-    upper_limit_acc = 8                     # Highest positive acceleration in gs
+    lower_limit_acc = -7                    # Highest negative acceleration in gs
+    upper_limit_acc = 7                     # Highest positive acceleration in gs
     lower_limit_v_vert = -12                # Highest negative vertical velocity in km/s
     upper_limit_v_vert = 12                 # Highest positive vertical velocity in km/s
     mean_of_last = 10                       # Mean value of last n acceleration values
@@ -130,7 +130,10 @@ def get_rocket_data(arguments):
                     lower_limit_v_vert <= v_vert_frame <= upper_limit_v_vert):
                 if stage == 2 and v_frame is not None:
                     try:
-                        if v_frame < v[0][-1] or h_frame < h[0][-1]:
+                        n = 1
+                        while v[0][-n] is None or h[0][-n] is None:
+                            n += 1
+                        if v_frame < v[0][-n] or h_frame < h[0][-n]:
                             continue
                     except IndexError:
                         t[stage - 1].append(None)
@@ -159,7 +162,8 @@ def get_rocket_data(arguments):
 
                 a_mean[stage - 1].append(a_frame_mean)
 
-                print("Stage", stage, ": t=", t_frame, "s, v=", v_frame, "kph, h=", h_frame, "km, a=", a_frame, "gs")
+                print("Stage " + str(stage) + ": t= " + str(t_frame) + " s, v= " + str(v_frame) + " kph, h= " +
+                      str(h_frame) + " km, a= " + str(a_frame_mean) + " gs")
             else:
                 t[stage - 1].append(None)
                 v[stage - 1].append(None)
@@ -361,7 +365,7 @@ def calculate_a_mean(a, stage, mean_of_last):
             if a[stage - 1][-m] is not None:
                 n_last.append(a[stage - 1][-m])
                 n += 1
-        a_frame_mean = mean(n_last)
+        a_frame_mean = round(mean(n_last), 3)
     except IndexError:
         a_frame_mean = None
     except TypeError:
