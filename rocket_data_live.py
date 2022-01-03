@@ -100,17 +100,22 @@ def get_rocket_data(arguments):
     start_time = time.time()
     frame_number = 0
     tf = 0  # Time between video start and T0
+    p = 0
 
     while True and cap.get(cv2.CAP_PROP_POS_MSEC) <= true_video_end_time:
 
-        p = (frame_number / every_n) - (int(frame_number / every_n))
+        p += 1
         frame_number += 1
         tf += (1 / fps)
 
         ret, frame = cap.read()
 
-        if p != 0:
+        if p != every_n:
             continue
+        elif p == 15:
+            p = 0
+        else:
+            quit()
 
         t_frame = round(tf, 3)
         print()
