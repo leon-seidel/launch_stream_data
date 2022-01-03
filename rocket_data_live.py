@@ -24,15 +24,15 @@ pytesseract.pytesseract.tesseract_cmd = 'C:/Program Files/Tesseract-OCR/tesserac
 def get_rocket_data(arguments):
     ##################################################################################################################
     # Performance ####################################################################################################
-    every_n = 15                            # Only analyse every nth frame
+    every_n = 20                            # Only analyse every nth frame
     # Plot settings ##################################################################################################
     upper_limit_velo_plot = 30000           # Upper limit of velocity plot
     upper_limit_alti_plot = 250             # Upper limit of altitude plot
-    lower_limit_acc_plot = -5               # Lower limit of acceleration plot
-    upper_limit_acc_plot = 5                # Upper limit of acceleration plot
+    lower_limit_acc_plot = -6               # Lower limit of acceleration plot
+    upper_limit_acc_plot = 6                # Upper limit of acceleration plot
     # Outlier prevention #############################################################################################
-    lower_limit_acc = -7                    # Highest negative acceleration in gs
-    upper_limit_acc = 7                     # Highest positive acceleration in gs
+    lower_limit_acc = -8                    # Highest negative acceleration in gs
+    upper_limit_acc = 8                     # Highest positive acceleration in gs
     lower_limit_v_vert = -12                # Highest negative vertical velocity in km/s
     upper_limit_v_vert = 12                 # Highest positive vertical velocity in km/s
     mean_of_last = 10                       # Mean value of last n acceleration values
@@ -112,10 +112,8 @@ def get_rocket_data(arguments):
 
         if p != every_n:
             continue
-        elif p == 15:
-            p = 0
         else:
-            quit()
+            p = 0
 
         t_frame = round(tf, 3)
         print()
