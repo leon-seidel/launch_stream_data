@@ -24,7 +24,7 @@ pytesseract.pytesseract.tesseract_cmd = 'C:/Program Files/Tesseract-OCR/tesserac
 def get_rocket_data(arguments):
     ##################################################################################################################
     # Performance ####################################################################################################
-    every_n = 20                            # Only analyse every nth frame
+    every_n = 15                            # Only analyse every nth frame
     # Plot settings ##################################################################################################
     upper_limit_velo_plot = 30000           # Upper limit of velocity plot
     upper_limit_alti_plot = 250             # Upper limit of altitude plot
