@@ -1,10 +1,13 @@
 # Get live data and plots from rocket launch live streams
 #
 # Arguments: --url (Video URL), --start (Start time in video), --duration (Duration of video from start time), supported
-# formats: 1:13:12, 3:12, 144 (h:min:s, min:s, s)). For livestreams just use --start live and a duration.
+# formats: 1:13:12, 3:12, 144 (h:min:s, min:s, s)) and --name (csv filename, optional).
+# For livestreams just use --start live and a duration.
 #
-# Example 1: python rocket_data_live.py --url https://www.youtube.com/watch?v=JBGjE9_aosc --start 19:53 --duration 8:24
-# Example 2: python rocket_data_live.py --url https://www.youtube.com/watch?v=JBGjE9_aosc --start live --duration 8:45
+# Example 1:
+# python rocket_data_live.py --url https://www.youtube.com/watch?v=JBGjE9_aosc --start 19:53 --duration 8:24
+# Example 2:
+# python rocket_data_live.py --url https://youtube.com/watch?v=JBGjE9_aosc --start live --duration 8:45 --name test.csv
 
 import os
 import re
@@ -35,6 +38,7 @@ def get_rocket_data(arguments):
     upper_limit_acc = 7                     # Highest positive acceleration in gs
     lower_limit_v_vert = -12                # Highest negative vertical velocity in km/s
     upper_limit_v_vert = 12                 # Highest positive vertical velocity in km/s
+    tresh_v_vert = 0.5                      # Vertical velocity is multiplied with this value before comparison to v
     mean_of_last = 15                       # Mean value of last n acceleration values
     # Telemetry data sources #########################################################################################
     # contains [y_start, y_end, x_start, x_end] of the bounding box ##################################################
@@ -126,10 +130,13 @@ def get_rocket_data(arguments):
 
             v_vert_frame = calculate_v_vert(t, h, t_frame, h_frame, stage)
 
-            # Outlier detection: Check if a_frame and v_vert_frame are within their predefined boundaries.
+            # Outlier detection: Check if a_frame and v_vert_frame are within their predefined boundaries and if
+            # v_vert_frame is lower than v_frame. The multiplier thres_v_vert is used to avoid skipping values where
+            # v_vert_frame and v are close togheter.
             # For stage 2: Check if v_frame and h_frame are higher than for stage 1.
-            if (a_frame is not None and lower_limit_acc <= a_frame <= upper_limit_acc and
-                    lower_limit_v_vert <= v_vert_frame <= upper_limit_v_vert):
+            if (a_frame is not None and v_vert_frame is not None and v_frame is not None and
+                    lower_limit_acc <= a_frame <= upper_limit_acc and lower_limit_v_vert <=
+                    v_vert_frame <= upper_limit_v_vert and (v_vert_frame * 3600 * tresh_v_vert) <= v_frame):
                 if stage == 2 and v_frame is not None:
                     try:
                         n = 1
@@ -183,7 +190,7 @@ def get_rocket_data(arguments):
 
     cap.release()
     print("Finished!")
-    save_as_csv(t, v, h, a_mean, number_of_stages, video_title)
+    save_as_csv(t, v, h, a_mean, number_of_stages, video_title, arguments.name)
 
     plt.waitforbuttonpress()
 
@@ -391,10 +398,15 @@ def update_plots(number_of_stages, t, v, h, a_mean, fig, sc):
     plt.pause(0.001)
 
 
-def save_as_csv(t, v, h, a_mean, number_of_stages, video_title):
+def save_as_csv(t, v, h, a_mean, number_of_stages, video_title, filename):
     file_dir = os.path.dirname(os.path.abspath(__file__))
     csv_folder = 'mission_data'
-    csv_filename = "".join(x for x in video_title if x.isalnum()) + ".csv"
+
+    if filename is None:
+        csv_filename = "".join(x for x in video_title if x.isalnum()) + ".csv"
+    else:
+        csv_filename = filename
+
     csv_file = os.path.join(file_dir, csv_folder, csv_filename)
 
     if number_of_stages == 1:
@@ -421,6 +433,7 @@ if __name__ == '__main__':
     parser.add_argument('--url', nargs='?', type=str, help='Video URL')
     parser.add_argument('--start', nargs='?', type=str, help='Video start time, formats: 1:13:12, 3:12, 144, live')
     parser.add_argument('--duration', nargs='?', type=str, help='Video duration, formats: 1:13:12, 3:12, 144')
+    parser.add_argument('--name', nargs='?', type=str, help='Name for csv file, for example ABLaunch25_07_21.csv')
 
     args = parser.parse_args()
 
