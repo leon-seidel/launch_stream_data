@@ -35,7 +35,7 @@ def get_rocket_data(arguments):
     upper_limit_acc = 7                     # Highest positive acceleration in gs
     lower_limit_v_vert = -12                # Highest negative vertical velocity in km/s
     upper_limit_v_vert = 12                 # Highest positive vertical velocity in km/s
-    mean_of_last = 10                       # Mean value of last n acceleration values
+    mean_of_last = 15                       # Mean value of last n acceleration values
     # Telemetry data sources #########################################################################################
     # contains [y_start, y_end, x_start, x_end] of the bounding box ##################################################
     f9_stage1 = [640, 670, 68, 264]         # Position of telemetry data in 720p video feed (Falcon 9, stage 1)
@@ -126,6 +126,8 @@ def get_rocket_data(arguments):
 
             v_vert_frame = calculate_v_vert(t, h, t_frame, h_frame, stage)
 
+            # Outlier detection: Check if a_frame and v_vert_frame are within their predefined boundaries.
+            # For stage 2: Check if v_frame and h_frame are higher than for stage 1.
             if (a_frame is not None and lower_limit_acc <= a_frame <= upper_limit_acc and
                     lower_limit_v_vert <= v_vert_frame <= upper_limit_v_vert):
                 if stage == 2 and v_frame is not None:
@@ -179,13 +181,11 @@ def get_rocket_data(arguments):
 
         update_plots(number_of_stages, t, v, h, a_mean, fig, sc)
 
-    print("Finished!")
-    plt.waitforbuttonpress()
-
     cap.release()
-    cv2.destroyAllWindows()
-
+    print("Finished!")
     save_as_csv(t, v, h, a_mean, number_of_stages, video_title)
+
+    plt.waitforbuttonpress()
 
 
 def get_video_times(arguments):
@@ -394,7 +394,8 @@ def update_plots(number_of_stages, t, v, h, a_mean, fig, sc):
 def save_as_csv(t, v, h, a_mean, number_of_stages, video_title):
     file_dir = os.path.dirname(os.path.abspath(__file__))
     csv_folder = 'mission_data'
-    csv_filename = os.path.join(file_dir, csv_folder, "".join(x for x in video_title if x.isalnum()) + ".csv")
+    csv_filename = "".join(x for x in video_title if x.isalnum()) + ".csv"
+    csv_file = os.path.join(file_dir, csv_folder, csv_filename)
 
     if number_of_stages == 1:
         column_names = ["t", "v", "h", "a"]
@@ -408,9 +409,9 @@ def save_as_csv(t, v, h, a_mean, number_of_stages, video_title):
         quit()
 
     df = pd.DataFrame(df_list, columns=column_names)
-    df.to_csv(csv_filename, index=False)
+    df.to_csv(csv_file, index=False)
 
-    print("Saved data!")
+    print("Saved data to " + csv_folder + "/" + csv_filename + "!")
 
 
 if __name__ == '__main__':

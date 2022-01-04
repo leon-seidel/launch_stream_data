@@ -1,7 +1,7 @@
 # Get live data and plots from rocket launch live streams
 #
 # Arguments: --url (Video URL), --start (Start time in video), --duration (Duration of video from start time), supported
-# formats: 1:13:12, 3:12, 144 (h:min:s, min:s, s)). For livestreams just use -- start live and a duration.
+# formats: 1:13:12, 3:12, 144 (h:min:s, min:s, s)). For livestreams just use --start live and a duration.
 #
 # Example 1: python rocket_data_live.py --url https://www.youtube.com/watch?v=JBGjE9_aosc --start 19:53 --duration 8:24
 # Example 2: python rocket_data_live.py --url https://www.youtube.com/watch?v=JBGjE9_aosc --start live --duration 8:45
@@ -22,27 +22,29 @@ pytesseract.pytesseract.tesseract_cmd = 'C:/Program Files/Tesseract-OCR/tesserac
 
 
 def get_rocket_data(arguments):
-
     ##################################################################################################################
+    # Performance ####################################################################################################
+    every_n = 60                            # Only analyse every nth frame
     # Plot settings ##################################################################################################
     upper_limit_velo_plot = 30000           # Upper limit of velocity plot
     upper_limit_alti_plot = 250             # Upper limit of altitude plot
-    lower_limit_acc_plot = -5               # Lower limit of acceleration plot
-    upper_limit_acc_plot = 5                # Upper limit of acceleration plot
+    lower_limit_acc_plot = -6               # Lower limit of acceleration plot
+    upper_limit_acc_plot = 6                # Upper limit of acceleration plot
+    wait_for_go = True
     # Outlier prevention #############################################################################################
-    lower_limit_acc = -5                    # Highest negative acceleration in gs
-    upper_limit_acc = 5                     # Highest positive acceleration in gs
-    lower_limit_v_vert = -10                # Highest negative vertical velocity in km/s
-    upper_limit_v_vert = 10                 # Highest positive vertical velocity in km/s
+    lower_limit_acc = -7                    # Highest negative acceleration in gs
+    upper_limit_acc = 7                     # Highest positive acceleration in gs
+    lower_limit_v_vert = -12                # Highest negative vertical velocity in km/s
+    upper_limit_v_vert = 12                 # Highest positive vertical velocity in km/s
     mean_of_last = 10                       # Mean value of last n acceleration values
-    every_n = 15                            # Only analyse every nth frame
     # Telemetry data sources #########################################################################################
     # contains [y_start, y_end, x_start, x_end] of the bounding box ##################################################
-    f9_stage1 = [640, 670, 68, 264]         # Position of telemetry data in 720p video feed (Falcon 9, stage 1)
-    f9_stage2 = [640, 670, 1016, 1207]      # Position of telemetry data in 720p video feed (Falcon 9, stage 2)
+    f9_stage1 = [640, 670, 68, 264]         # Position of telemetry data in 720p video feed (SpaceX Falcon 9, stage 1)
+    f9_stage2 = [640, 670, 1016, 1207]      # Position of telemetry data in 720p video feed (SpaceX Falcon 9, stage 2)
+    f9_clock = [651, 685, 590, 731]         # Position of countdown clock in 720p video feed (SpaceX Falcon 9)
     rocketlab = [35, 55, 976, 1124]         # Position of telemetry data in 720p video feed (Rocket Lab Electron)
     jwst = [542, 685, 170, 248]             # Position of telemetry data in 720p video feed (JWST stream Arianespace)
-    labpadre = [0, 30, 1140, 1205]
+    labpadre = [0, 30, 1140, 1205]          # Position of clock in livestream (just for livestream testing)
     ##################################################################################################################
 
     url = arguments.url
@@ -56,6 +58,7 @@ def get_rocket_data(arguments):
 
     if video_author == "SpaceX":
         pos_stage = [f9_stage1, f9_stage2]
+        pos_clock = f9_clock
     elif video_author == "Rocket Lab":
         pos_stage = [rocketlab]
     elif video_author == "arianespace":
@@ -63,6 +66,7 @@ def get_rocket_data(arguments):
     elif video_author == "LabPadre":
         pos_stage = [labpadre]
     else:
+        pos_clock = None
         pos_stage = None
         print("Youtube channel " + video_author + " not supported.")
         quit()
@@ -99,17 +103,25 @@ def get_rocket_data(arguments):
 
     start_time = time.time()
     frame_number = 0
-    tf = 0              # Time between video start and T0
+    tf = 0  # Time between video start and T0
+    p = 0
 
     while True and cap.get(cv2.CAP_PROP_POS_MSEC) <= true_video_end_time:
 
-        p = (frame_number / every_n) - (int(frame_number / every_n))
+        p += 1
         frame_number += 1
         tf += (1 / fps)
 
         ret, frame = cap.read()
 
-        if p != 0:
+        if p != every_n:
+            continue
+        else:
+            p = 0
+
+        if wait_for_go is True:
+            wait_for_go, true_video_end_time = get_countdown_time(cap, frame, pos_clock, video_duration)
+            tf = 0
             continue
 
         t_frame = round(tf, 3)
@@ -127,7 +139,10 @@ def get_rocket_data(arguments):
                     lower_limit_v_vert <= v_vert_frame <= upper_limit_v_vert):
                 if stage == 2 and v_frame is not None:
                     try:
-                        if v_frame < v[0][-1] or h_frame < h[0][-1]:
+                        n = 1
+                        while v[0][-n] is None or h[0][-n] is None:
+                            n += 1
+                        if v_frame < v[0][-n] or h_frame < h[0][-n]:
                             continue
                     except IndexError:
                         t[stage - 1].append(None)
@@ -156,7 +171,8 @@ def get_rocket_data(arguments):
 
                 a_mean[stage - 1].append(a_frame_mean)
 
-                print("Stage", stage, ": t=", t_frame, "s, v=", v_frame, "kph, h=", h_frame, "km, a=", a_frame, "gs")
+                print("Stage " + str(stage) + ": t= " + str(t_frame) + " s, v= " + str(v_frame) + " kph, h= " +
+                      str(h_frame) + " km, a= " + str(a_frame_mean) + " gs")
             else:
                 t[stage - 1].append(None)
                 v[stage - 1].append(None)
@@ -181,8 +197,30 @@ def get_rocket_data(arguments):
     save_as_csv(t, v, h, a_mean, number_of_stages, video_title)
 
 
-def get_video_times(arguments):
+def get_countdown_time(cap, frame, pos_clock, video_duration):
+    cropped = frame[pos_clock[0]:pos_clock[1], pos_clock[2]:pos_clock[3]]
 
+    gray = cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY)
+
+    custom_config = '--oem 3 --psm 6 '
+    text = pytesseract.image_to_string(gray, config=custom_config)
+    text_list = re.findall(r"[-+]?\d*\.?\d+|[-+]?\d+", text)
+
+    if len(text_list) == 3:
+        print(text_list[0], ":", text_list[1], ":", text_list[2])
+    else:
+        print("Waiting")
+
+    if len(text_list) == 3 and text_list[0] == "00" and text_list[1] == "00" and text_list[2] == "00":
+        wait_for_go = False
+    else:
+        wait_for_go = True
+
+    true_video_end_time = cap.get(cv2.CAP_PROP_POS_MSEC) + video_duration * 1000
+    return wait_for_go, true_video_end_time
+
+
+def get_video_times(arguments):
     video_start_time, video_end_time, video_duration, is_live = 0, 0, 0, False
 
     if ":" in arguments.duration:
@@ -216,7 +254,6 @@ def get_video_times(arguments):
 
 def start_plots(number_of_stages, video_title, upper_limit_velo_plot, upper_limit_alti_plot, upper_limit_acc_plot,
                 lower_limit_acc_plot, video_duration, t, v, h, a_mean):
-
     fig, ax, sc = [], [], [[], [], []]
 
     # Velocity plot
@@ -280,7 +317,6 @@ def start_plots(number_of_stages, video_title, upper_limit_velo_plot, upper_limi
 
 
 def get_text_from_frame(video_author, frame, pos_stage, stage):
-
     cropped = frame[pos_stage[stage - 1][0]:pos_stage[stage - 1][1], pos_stage[stage - 1][2]:pos_stage[stage - 1][3]]
 
     gray = cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY)
@@ -320,7 +356,6 @@ def get_text_from_frame(video_author, frame, pos_stage, stage):
 
 
 def calculate_acc(t, v, t_frame, v_frame, stage):
-
     try:
         m = 0
         while True:
@@ -337,7 +372,6 @@ def calculate_acc(t, v, t_frame, v_frame, stage):
 
 
 def calculate_v_vert(t, h, t_frame, h_frame, stage):
-
     try:
         m = 0
         while True:
@@ -354,7 +388,6 @@ def calculate_v_vert(t, h, t_frame, h_frame, stage):
 
 
 def calculate_a_mean(a, stage, mean_of_last):
-
     try:
         n = 0
         m = 0
@@ -364,7 +397,7 @@ def calculate_a_mean(a, stage, mean_of_last):
             if a[stage - 1][-m] is not None:
                 n_last.append(a[stage - 1][-m])
                 n += 1
-        a_frame_mean = mean(n_last)
+        a_frame_mean = round(mean(n_last), 3)
     except IndexError:
         a_frame_mean = None
     except TypeError:
@@ -374,7 +407,6 @@ def calculate_a_mean(a, stage, mean_of_last):
 
 
 def update_plots(number_of_stages, t, v, h, a_mean, fig, sc):
-
     for stage in range(1, number_of_stages + 1):
         sc[0][stage - 1].set_offsets(np.c_[t[stage - 1], v[stage - 1]])
     fig[0].canvas.draw_idle()
@@ -392,7 +424,6 @@ def update_plots(number_of_stages, t, v, h, a_mean, fig, sc):
 
 
 def save_as_csv(t, v, h, a_mean, number_of_stages, video_title):
-
     file_dir = os.path.dirname(os.path.abspath(__file__))
     csv_folder = 'mission_data'
     csv_filename = os.path.join(file_dir, csv_folder, "".join(x for x in video_title if x.isalnum()) + ".csv")
