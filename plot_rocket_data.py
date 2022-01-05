@@ -34,8 +34,8 @@ for data_type in data_types:
             plt.scatter(df.t, df.h1)
             plt.scatter(df.t, df.h2)
         elif data_type == "acc":
-            plt.scatter(df.t, df.a1)
-            plt.scatter(df.t, df.a2)
+            plt.scatter(df.t, df.a1*9.81)
+            plt.scatter(df.t, df.a2*9.81)
 
     elif plot_type == "plot" and col_number == 4:
         if data_type == "velo":
@@ -72,5 +72,3 @@ for data_type in data_types:
     plt.grid()
 
 plt.show()
-
-

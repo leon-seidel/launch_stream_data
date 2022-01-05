@@ -1,4 +1,4 @@
-# Get live data and plots from rocket launch live streams
+# Get live data and plots from rocket launch live streams. Correction of acceleration by Newton's law of gravitation.
 #
 # Arguments: --url (Video URL), --start (Start time in video), --duration (Duration of video from start time), supported
 # formats: 1:13:12, 3:12, 144 (h:min:s, min:s, s)) and --name (csv filename, optional).
@@ -12,6 +12,7 @@
 import os
 import re
 import cv2
+import math
 import pafy                             # Install with: pip install git+https://github.com/Cupcakus/pafy
 import time
 import argparse
@@ -31,11 +32,11 @@ def get_rocket_data(arguments):
     # Plot settings ##################################################################################################
     upper_limit_velo_plot = 30000           # Upper limit of velocity plot
     upper_limit_alti_plot = 250             # Upper limit of altitude plot
-    lower_limit_acc_plot = -6               # Lower limit of acceleration plot
-    upper_limit_acc_plot = 6                # Upper limit of acceleration plot
+    lower_limit_acc_plot = -60              # Lower limit of acceleration plot
+    upper_limit_acc_plot = 60               # Upper limit of acceleration plot
     # Outlier prevention #############################################################################################
-    lower_limit_acc = -7                    # Highest negative acceleration in gs
-    upper_limit_acc = 7                     # Highest positive acceleration in gs
+    lower_limit_acc = -70                   # Highest negative acceleration in m/s^2
+    upper_limit_acc = 70                    # Highest positive acceleration in m/s^2
     lower_limit_v_vert = -12                # Highest negative vertical velocity in km/s
     upper_limit_v_vert = 12                 # Highest positive vertical velocity in km/s
     tresh_v_vert = 0.5                      # Vertical velocity is multiplied with this value before comparison to v
@@ -47,6 +48,10 @@ def get_rocket_data(arguments):
     rocketlab = [35, 55, 976, 1124]         # Position of telemetry data in 720p video feed (Rocket Lab Electron)
     jwst = [542, 685, 170, 248]             # Position of telemetry data in 720p video feed (JWST stream Arianespace)
     labpadre = [0, 30, 1140, 1205]          # Position of clock in livestream (just for livestream testing)
+    # Constants ######################################################################################################
+    gc = 6.6723e-11                         # Gravitational constant (m^3/kgs^2)
+    m_earth = 5.972e24                      # Earth mass (kg)
+    r_earth = 6.371e6                       # Earth radius (m)
     ##################################################################################################################
 
     url = arguments.url
@@ -123,12 +128,25 @@ def get_rocket_data(arguments):
         print()
 
         for stage in range(1, number_of_stages + 1):
-
+            # v_frame in km/h, h_frame in km
             v_frame, h_frame = get_text_from_frame(video_author, frame, pos_stage, stage)
-
-            a_frame = calculate_acc(t, v, t_frame, v_frame, stage)
-
+            # a_read_frame in m/s^2: veloity change rate
+            a_read_frame = calculate_acc(t, v, t_frame, v_frame, stage)
+            # v_vert_frame in km/s: vertical velocity
             v_vert_frame = calculate_v_vert(t, h, t_frame, h_frame, stage)
+            # v_hori_frame in km/s: horizontal velocity
+            v_hori_frame = calculate_v_hori(v_frame, v_vert_frame)
+            # a_corr_frame in m/s^2: gravitational acceleration by Newton's law of universal gravitation
+            # Using a = MG/r^2 - v^2/r (derived by difference between mMG/r^2 and mv^2/r)
+            a_corr_frame = calculate_a_corr(h_frame, v_hori_frame, gc, m_earth, r_earth)
+
+            # a_frame in m/s^2: sum of read acceleration and gravitational acceleration
+            if a_read_frame is not None and a_corr_frame is not None:
+                a_frame = a_read_frame + a_corr_frame
+            elif a_read_frame is not None and a_corr_frame is None:
+                a_frame = a_read_frame
+            else:
+                a_frame = None
 
             # Outlier detection: Check if a_frame and v_vert_frame are within their predefined boundaries and if
             # v_vert_frame is lower than v_frame. The multiplier thres_v_vert is used to avoid skipping values where
@@ -172,7 +190,7 @@ def get_rocket_data(arguments):
                 a_mean[stage - 1].append(a_frame_mean)
 
                 print("Stage " + str(stage) + ": t= " + str(t_frame) + " s, v= " + str(v_frame) + " kph, h= " +
-                      str(h_frame) + " km, a= " + str(a_frame_mean) + " gs")
+                      str(h_frame) + " km, a= " + str(a_frame_mean) + " m/s^2")
             else:
                 t[stage - 1].append(None)
                 v[stage - 1].append(None)
@@ -284,7 +302,7 @@ def start_plots(number_of_stages, video_title, upper_limit_velo_plot, upper_limi
     plt.xlim(0, video_duration)
     plt.ylim(lower_limit_acc_plot, upper_limit_acc_plot)
     plt.xlabel("Time in s")
-    plt.ylabel("Acceleration in gs")
+    plt.ylabel("Acceleration in m/s^2")
     plt.grid()
     plt.draw()
 
@@ -336,7 +354,7 @@ def calculate_acc(t, v, t_frame, v_frame, stage):
         while True:
             m += 1
             if not [x for x in (v[stage - 1][-m], t[stage - 1][-m], v_frame, t_frame) if x is None]:
-                a_frame = ((v_frame - v[stage - 1][-m]) / (3.6 * 9.81)) / (t_frame - t[stage - 1][-m])
+                a_frame = ((v_frame - v[stage - 1][-m]) / 3.6) / (t_frame - t[stage - 1][-m])
                 return a_frame
             elif [x for x in (v_frame, t_frame) if x is None]:
                 a_frame = None
@@ -360,6 +378,35 @@ def calculate_v_vert(t, h, t_frame, h_frame, stage):
     except IndexError:
         v_vert_frame = 0
         return v_vert_frame
+
+
+def calculate_v_hori(v_frame, v_vert_frame):
+    if v_frame is None or v_vert_frame is None:
+        v_hori_frame = None
+    elif v_frame < 0 or v_vert_frame < 0:
+        v_hori_frame = None
+    elif v_vert_frame >= v_frame / 3600:
+        v_hori_frame = 0
+    else:
+        v_frame_kms = v_frame / 3600        # Total velocity in km/s
+
+        v_hori_frame = math.sqrt(math.pow(v_frame_kms, 2) - math.pow(v_vert_frame, 2))
+
+    return v_hori_frame     # Horizontal velocity in km/s
+
+
+def calculate_a_corr(h_frame, v_hori_frame, gc, m_earth, r_earth):
+    # Using a = MG/r^2 - v^2/r (derived by difference between mMG/r^2 and mv^2/r)
+    if h_frame is None or v_hori_frame is None:
+        a_corr_frame = None
+    else:
+        h_frame_m = h_frame * 1000                  # Altitude in m
+        v_hori_frame_ms = v_hori_frame * 1000       # Horzontal velocity in m/s
+
+        a_corr_frame = (m_earth * gc) / math.pow((h_frame_m + r_earth), 2) - math.pow(v_hori_frame_ms, 2) / \
+                       (h_frame_m + r_earth)
+
+    return a_corr_frame                             # Correction of acceleration in m/s^2
 
 
 def calculate_a_mean(a, stage, mean_of_last):
