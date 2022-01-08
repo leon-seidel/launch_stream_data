@@ -119,6 +119,10 @@ def get_rocket_data(arguments):
 
         ret, frame = cap.read()
 
+        if frame is None:
+            print("\nVideo ended here.")
+            break
+
         if p != every_n:
             continue
         else:
@@ -207,7 +211,7 @@ def get_rocket_data(arguments):
         update_plots(number_of_stages, t, v, h, a_mean, fig, sc)
 
     cap.release()
-    print("Finished!")
+    print("\nFinished!")
     save_as_csv(t, v, h, a_mean, number_of_stages, video_title, arguments.name)
 
     plt.waitforbuttonpress()
@@ -470,7 +474,7 @@ def save_as_csv(t, v, h, a_mean, number_of_stages, video_title, filename):
     df = pd.DataFrame(df_list, columns=column_names)
     df.to_csv(csv_file, index=False)
 
-    print("Saved data to " + csv_folder + "/" + csv_filename + "!")
+    print("\nSaved data to " + csv_folder + "/" + csv_filename + "!")
 
 
 if __name__ == '__main__':
