@@ -115,7 +115,8 @@ def get_rocket_data(arguments):
 
         p += 1
         frame_number += 1
-        frame_time += (1 / fps)
+
+        frame_time += 1 / fps
 
         if p != every_n:
             cap.grab()

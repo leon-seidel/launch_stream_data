@@ -33,7 +33,7 @@ Tesseract must be installed on the system and referenced, installation link for 
 ![Altitude plot](examples/dart_alti.png?raw=true)
 ![Acceleration plot](examples/dart_acc.png?raw=true)
 
-### Transporter-2
-![Velocity plot](examples/transporter2_velo.png?raw=true)
-![Altitude plot](examples/transporter2_alti.png?raw=true)
-![Acceleration plot](examples/transporter2_acc.png?raw=true)
+### Transporter-3
+![Velocity plot](examples/transporter3_velo.png?raw=true)
+![Altitude plot](examples/transporter3_alti.png?raw=true)
+![Acceleration plot](examples/transporter3_acc.png?raw=true)
