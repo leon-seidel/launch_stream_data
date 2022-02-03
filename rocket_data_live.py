@@ -28,7 +28,7 @@ pytesseract.pytesseract.tesseract_cmd = 'C:/Program Files/Tesseract-OCR/tesserac
 def get_rocket_data(arguments):
     ##################################################################################################################
     # Performance ####################################################################################################
-    every_n = 15                            # Only analyse every nth frame
+    every_n = 25                            # Only analyse every nth frame
     # Plot settings ##################################################################################################
     upper_limit_velo_plot = 30000           # Upper limit of velocity plot
     upper_limit_alti_plot = 250             # Upper limit of altitude plot
@@ -137,9 +137,6 @@ def get_rocket_data(arguments):
             v_frame, h_frame = get_text_from_frame(video_author, frame, pos_stage, stage)
             # a_read_frame in m/s^2: veloity change rate
             a_read_frame = calculate_acc(t, v, t_frame, v_frame, stage)
-            # Live bug leading to doubled accelerations
-            if is_live is True and a_read_frame is not None:
-                a_read_frame = 0.5 * a_read_frame
             # v_vert_frame in km/s: vertical velocity
             v_vert_frame = calculate_v_vert(t, h, t_frame, h_frame, stage)
             # v_hori_frame in km/s: horizontal velocity
