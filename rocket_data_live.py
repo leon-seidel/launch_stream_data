@@ -33,7 +33,7 @@ def get_rocket_data(arguments):
     every_n = 15                            # Only analyse every nth frame
     # Plot settings ##################################################################################################
     upper_limit_velo_plot = 30000           # Upper limit of velocity plot
-    upper_limit_alti_plot = 250             # Upper limit of altitude plot
+    upper_limit_alti_plot = 600             # Upper limit of altitude plot
     lower_limit_acc_plot = -60              # Lower limit of acceleration plot
     upper_limit_acc_plot = 60               # Upper limit of acceleration plot
     # Outlier prevention #############################################################################################
@@ -50,6 +50,7 @@ def get_rocket_data(arguments):
     rocketlab = [35, 55, 976, 1124]         # Position of telemetry data in 720p video feed (Rocket Lab Electron)
     jwst = [542, 685, 170, 248]             # Position of telemetry data in 720p video feed (JWST stream Arianespace)
     labpadre = [0, 30, 1140, 1205]          # Position of clock in livestream (just for livestream testing)
+    astra = [654, 677, 1045, 1180]          # position of telemetry data in 720p video feed (NSF - Astra)
     # Constants ######################################################################################################
     gc = 6.6723e-11                         # Gravitational constant (m^3/kgs^2)
     m_earth = 5.972e24                      # Earth mass (kg)
@@ -67,14 +68,22 @@ def get_rocket_data(arguments):
 
     if video_author == "SpaceX":
         pos_stage = [f9_stage1, f9_stage2]
+        velo_unit = "kph"
     elif video_author == "Rocket Lab":
         pos_stage = [rocketlab]
+        velo_unit = "kph"
     elif video_author == "arianespace":
         pos_stage = [jwst]
+        velo_unit = "kph"
     elif video_author == "LabPadre":
         pos_stage = [labpadre]
+        velo_unit = "kph"
+    elif video_author == "NASASpaceflight":
+        pos_stage = [astra]
+        velo_unit = "ms"
     else:
         pos_stage = None
+        velo_unit = "kph"
         print("Youtube channel " + video_author + " not supported.")
         quit()
 
@@ -137,6 +146,11 @@ def get_rocket_data(arguments):
         for stage in range(1, number_of_stages + 1):
             # v_frame in km/h, h_frame in km
             v_frame, h_frame = get_text_from_frame(video_author, frame, pos_stage, stage)
+
+            # Change velocity unit if it is not kp/h
+            if velo_unit == "ms" and v_frame is not None:
+                v_frame = v_frame * 3.6     # If v_frame is in m/s
+
             # a_read_frame in m/s^2: veloity change rate
             a_read_frame = calculate_acc(t, v, t_frame, v_frame, stage)
             # v_vert_frame in km/s: vertical velocity
